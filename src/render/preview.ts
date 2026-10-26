@@ -2,17 +2,21 @@
  * Visual preview of the voxel pipeline (preview.html): a tower with random
  * shops from every country, a floor under construction and the plane fleet.
  * Query params: ?style=cube|pixel&seed=3&floors=8&scale=3&ppv=10
+ * &country=tropicalia themes the airport scenery (default: neutral land).
  * ?scene=vips shows the VIP line-up instead (&vips=rockeur,diva to pick some).
  */
 import { COUNTRIES } from '../core/data/countries';
 import { PLANE_MODELS } from '../core/data/planes';
 import { SHOPS } from '../core/data/shops';
 import { VIPS } from '../core/data/vips';
+import type { Element } from '../core/types';
 import { FLOOR } from './models/floor';
 import { VIP_SIZE } from './models/vip';
 import { pick, rng } from './palette';
 import { PixelRenderer } from './pixelRenderer';
-import { buildApron, buildTower, buildVipLineup, floorY, VIP_SPACING } from './tower';
+import { buildTower, buildVipLineup, floorY, VIP_SPACING } from './tower';
+import { AirportScene } from './airport';
+import { Color } from 'three';
 
 const params = new URLSearchParams(location.search);
 const seed = Number(params.get('seed') ?? 1);
@@ -44,9 +48,28 @@ if (vipScene) {
     i === floorCount - 1 ? { building: true } : { shop: pick(rand, SHOPS) },
   );
   view.scene.add(buildTower(floors));
-  view.scene.add(
-    buildApron(PLANE_MODELS.slice(0, 3).map((model, i) => ({ model, livery: COUNTRIES[(seed + i) % COUNTRIES.length].id }))),
-  );
+  const airport = new AirportScene();
+  airport.setTheme((params.get('country') as Element | null) ?? 'neutre');
+  view.scene.background = new Color(airport.sky);
+  const fleet = PLANE_MODELS.slice(0, 4).map((model, i) => ({
+    uid: `p${i}`,
+    modelId: model.id,
+    flying: false,
+    livery: COUNTRIES[(seed + i) % COUNTRIES.length].id,
+  }));
+  airport.sync(fleet, Date.now());
+  // The first plane leaves after a second so a takeoff is always on show.
+  setTimeout(() => {
+    fleet[0].flying = true;
+    airport.sync(fleet, Date.now());
+  }, 1000);
+  view.scene.add(airport.group);
+  const loop = () => {
+    requestAnimationFrame(loop);
+    airport.tick(Date.now());
+    view.render();
+  };
+  requestAnimationFrame(loop);
   scroll = floorY(1);
   maxY = floorY(floorCount + 1);
   center = () => view.target.set(FLOOR.width / 2, scroll, FLOOR.depth / 2);

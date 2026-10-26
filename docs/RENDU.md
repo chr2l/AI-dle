@@ -26,3 +26,10 @@ Chaîne choisie (voir GDD §15-16) : tout est **généré par du code TypeScript
 `src/render/models/vip.ts` : figurines « chibi » (grosse tête, petit corps) décrites par un `VipLook` (peau, coiffure, chapeau, détails du visage, tenue, cape, accessoire). Chaque VIP de `src/core/data/vips.ts` est un **clin d'œil parodique** à une figure connue (champ `nod`) : nom détourné, silhouette et accessoire signature, jamais de nom réel ni de copie d'un personnage protégé. Aperçu : `/preview.html?scene=vips` (ou `&vips=rockeur,diva`).
 
 Les couleurs sont écrites en sRGB et converties en linéaire à la cuisson (`srgbToLinear`), sinon le rendu paraît délavé.
+
+## Décor et aéroport vivant
+
+- `src/render/models/scenery.ts` : décor procédural autour de la tour, habillé selon le **pays de la semaine** (`featuredCountry`) : sol, végétation (palmiers, sapins enneigés, cactus, lave, néons, enceintes, sucettes, nuages…), ciel, piste avec balisage et feux, taxiway, tarmac, hangar, route et parking. L'emprise de la tour reste libre.
+- `src/render/airport.ts` : `AirportScene` gère les avions garés (rangée sur le tarmac), les décollages et les atterrissages (`flightPose`) quand un vol part ou revient dans `GameState`, et un trafic d'ambiance de temps en temps. Effets : poussière au roulage, bouffée au décollage, fumée au toucher, traînées, ombre qui rétrécit avec l'altitude, petit rebond à l'atterrissage, feux d'approche, oiseaux, voitures, nuages.
+- `TowerView` appelle `airport.tick()` à 30 images/s (rien quand la vue est cachée) et `airport.sync()` à chaque `update(state)`.
+- Aperçu : `/preview.html?country=givrebourg` (un avion décolle après 1 s).
