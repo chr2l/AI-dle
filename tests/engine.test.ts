@@ -11,6 +11,7 @@ import {
   doubleOffline,
   openShop,
   recruit,
+  renamePlane,
   repairPlane,
   rerollShop,
   resolveEvent,
@@ -192,6 +193,15 @@ describe('planes', () => {
     expect(state.coins).toBe(1e6 - 5000);
     expect(buyPlane(state, 'libellule').ok).toBe(true); // hangar 3 at level 3
     expect(buyPlane(state, 'libellule').ok).toBe(false);
+  });
+
+  it('renames a plane', () => {
+    const plane = state.planes[0];
+    expect(renamePlane(state, plane.uid, '  Le   Pélican ').ok).toBe(true);
+    expect(plane.name).toBe('Le Pélican');
+    expect(renamePlane(state, plane.uid, '   ').ok).toBe(false);
+    expect(renamePlane(state, plane.uid, 'x'.repeat(17)).ok).toBe(false);
+    expect(renamePlane(state, 'nope', 'A').ok).toBe(false);
   });
 });
 
