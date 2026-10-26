@@ -388,6 +388,16 @@ export function buyPlane(state: GameState, modelId: string, rng: Rng = Math.rand
   return ok(plane);
 }
 
+/** Gives a plane a name of the player's choice (1 to 16 characters). */
+export function renamePlane(state: GameState, planeUid: string, name: string): Result {
+  const plane = findPlane(state, planeUid);
+  if (!plane) return fail('Avion introuvable.');
+  const clean = name.trim().replace(/\s+/g, ' ');
+  if (clean.length < 1 || clean.length > 16) return fail('Le nom doit faire entre 1 et 16 caractères.');
+  plane.name = clean;
+  return done;
+}
+
 export function upgradePlane(state: GameState, planeUid: string, stat: StatKey): Result {
   const plane = findPlane(state, planeUid);
   if (!plane) return fail('Avion introuvable.');

@@ -552,3 +552,25 @@ Le moteur reste jouable hors ligne : tout passe par une interface `SocialBackend
 
 ### 20.6 Ce qui reste à faire
 Serveur réel et authentification, lien de partage du code, écran de visite 3D, modération des noms, notifications « X vous a envoyé un cadeau ».
+
+## 21. Interface et prise en main
+
+Interface DOM (`src/ui`) au-dessus de la vue cube art, pensée pour le portrait mobile.
+
+- **Boutons** : verbe + coût ou gain sur deux lignes. Un bouton indisponible reste touchable et explique pourquoi (« Il manque 120 🪙 », « Niveau 6 requis »). Couleurs : jaune = action principale, violet = pub récompensée, turquoise = payé en Miles, gris = secondaire.
+- **Tour** : journal de mission posé sur la vue de l'aéroport (mission, conseil, quêtes du jour). Le hall montre la salle d'embarquement et les VIP présents. Les étages forment un tableau de bord sans boutons : ❗ = action attendue, ⬆ vert = amélioration abordable ; toucher un étage ouvre ses options.
+- **Vols** : sous-vues Avions / Pays / Recherche. Une fiche par avion, en défilement vertical : aperçu cube art, statut et action, caractéristiques avec jauges d'amélioration, 3 sièges d'équipage et emplacements d'équipement modifiables, nom modifiable.
+- **Tutoriel** : le conseil suit la mission en cours (§11) ; le bouton à toucher clignote, ou l'onglet à ouvrir s'il est ailleurs. Écran de bienvenue au premier lancement, aide ⓘ sur chaque section et sur les compteurs du HUD.
+- **Déblocage progressif** (annoncé par un écran « Nouveau ! ») :
+
+| Fonction | Mission atteinte | ou niveau |
+|---|---|---|
+| Objectifs | 2 (Ouvrir un magasin) | 2 |
+| Vols | 4 (Envoyer un vol) | 2 |
+| Équipe | 7 (Recruter) | 3 |
+| Recherche | 11 (Terminer une recherche) | 3 |
+| Événements saisonniers, Amis, Laboratoire | — | 2, 3, 3 |
+| Franchise (aperçu, active au niveau 12) | — | 10 |
+
+- **Retours** : pièces et Miles qui volent vers le compteur, confettis (mission, niveau, déblocage), sons synthétisés (coupables dans le HUD), vibrations légères (Capacitor Haptics), glissement horizontal pour changer d'onglet, pastilles de notification sur les onglets.
+- **Typo** : Nunito (texte) et Lilita One (titres, chiffres), embarquées dans l'APK.

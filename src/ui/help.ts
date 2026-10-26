@@ -1,0 +1,37 @@
+// Short explanations behind every ⓘ button and HUD counter.
+
+export const HELP: Record<string, { title: string; body: string[] }> = {
+  welcome: {
+    title: '✈️ Bienvenue à IdlePort !',
+    body: [
+      '🏢 <b>Tour</b> : construisez des étages et ouvrez-y des magasins. Ils vendent tout seuls et vous rapportent des pièces 🪙, même quand le jeu est fermé.',
+      '📦 Quand un rayon est vide, touchez l’étage et commandez des produits.',
+      '👥 Les magasins attirent des passagers dans la salle d’embarquement. Dans <b>Vols</b>, envoyez vos avions vers les pays : billets 🪙 et ressources au retour.',
+      '👨‍✈️ <b>Équipe</b> : recrutez des équipiers et placez-les dans vos avions pour les rendre meilleurs.',
+      '🎯 <b>Objectifs</b> : missions, quêtes du jour et succès donnent des Miles ✈️, la monnaie rare.',
+      '👉 Suivez le <b>journal de mission</b> en haut de la tour : le bouton à toucher clignote. Glissez à gauche ou à droite pour changer d’onglet.',
+    ],
+  },
+  coins: { title: '🪙 Pièces', body: ['La monnaie principale. Vos magasins en produisent chaque seconde, les vols en rapportent au retour.', 'Elles servent à construire, améliorer, acheter des avions et recruter.'] },
+  miles: { title: '✈️ Miles', body: ['La monnaie rare, gagnée avec les missions, quêtes, succès et VIP.', 'Elle sert à finir un chrono tout de suite (boutons ⚡), au recrutement premium et à retirer un magasin au sort.'] },
+  level: { title: '⭐ Niveau de l’aéroport', body: ['Chaque dépense et chaque vol donne de l’expérience. Monter de niveau permet plus d’étages, plus d’avions et ouvre de nouveaux pays.'] },
+  lounge: { title: '👥 Salle d’embarquement', body: ['Les passagers arrivent tout seuls, plus vite si vous avez beaucoup de magasins.', 'Un avion embarque autant de passagers que ses places le permettent : pas de passagers, pas de billets !', 'Agrandissez la salle pour qu’elle ne déborde pas pendant votre absence.'] },
+  floors: { title: '🏢 Étages', body: ['Touchez un étage pour voir ses options. Un ❗ signale qu’il attend une action (rayons vides, étage sans magasin).', 'Chaque magasin vend son stock tout seul ; plus il est rare et amélioré, plus il rapporte.', 'Deux magasins voisins du même pays (élément) se donnent chacun +10 %.'] },
+  hall: { title: '🛎️ Hall et VIP', body: ['Des VIP passent parfois dans le hall.', 'Les VIP à pouvoir (🏗️ 📦 🤳 🎧 💰) agissent quand vous touchez « Utiliser ».', 'Les VIP voyageurs veulent aller dans un pays précis : envoyez un avion assez confortable vers ce pays, ils embarquent tout seuls et paient très bien.', 'Un passager perdu 🧍 cherche un étage : touchez cet étage puis « Guider » pour un pourboire.'] },
+  lab: { title: '🧪 Laboratoire', body: ['Choisissez deux de vos magasins : ils restent en place, et la fusion donne le plan d’un nouveau magasin, souvent plus rare.', 'Installez ensuite le plan sur un étage vide.'] },
+  franchise: { title: '🌟 Franchise', body: ['Recommencez un nouvel aéroport en gardant des étoiles de prestige : chaque étoile augmente tous vos gains de 5 %.'] },
+  fleet: { title: '🛩️ Flotte', body: ['Glissez de haut en bas pour passer d’un avion à l’autre.', 'Chaque barre ⬆️ est une amélioration achetée avec des pièces. Les équipiers et les équipements s’ajoutent par-dessus.', 'Un avion ne peut pas changer d’équipage ni d’équipement pendant un vol.'] },
+  stats: { title: '📊 Caractéristiques', body: ['💨 Vitesse : vols plus courts.', '👥 Capacité : plus de passagers donc plus de billets.', '🗺️ Autonomie : destinations plus lointaines, mieux payées.', '🛋️ Confort : billets plus chers, exigé par les VIP.', '🔧 Fiabilité : évite les incidents et les pannes.'] },
+  crew: { title: '👨‍✈️ Équipage', body: ['Chaque avion a 3 sièges : Pilote (vitesse), Cabine (confort), Mécano (fiabilité).', 'Plus l’équipier est rare et de haut niveau, plus le bonus est fort. Ses traits ajoutent des bonus spéciaux.', 'Un équipier du même pays que la destination augmente aussi les gains.'] },
+  modules: { title: '🧩 Équipements', body: ['Les équipements se débloquent par la recherche (2ᵉ technologie de chaque pays).', 'Chaque modèle d’avion a un nombre d’emplacements limité.'] },
+  countries: { title: '🌍 Pays', body: ['Chaque pays a sa ressource, utile pour la recherche. De nouveaux pays s’ouvrent avec le niveau de l’aéroport.', 'Les destinations changent toutes les 4 heures ; celle « à la une » paie ×1,5.', 'Calme : normal. Ruée : ×1,5 billets. Festival : ×1,5 ressources. Tempête : ×2 mais plus d’incidents.'] },
+  research: { title: '🔬 Recherche', body: ['Une recherche à la fois. Elle coûte des pièces et la ressource du pays.', 'Elle débloque des magasins exclusifs, des équipements d’avion et des décorations qui donnent des bonus permanents.'] },
+  events: { title: '⚠️ Incidents de vol', body: ['Pendant un vol, il peut se passer quelque chose. Choisissez une option : le pourcentage est votre chance de réussite.'] },
+  recruit: { title: '🧑‍✈️ Recrutement', body: ['Standard (pièces) : 70 % Commun, 25 % Rare, 4,5 % Épique, 0,5 % Légendaire.', 'Premium (Miles) : au moins Rare, 7 % Légendaire.', 'Gratuit avec une pub toutes les 4 heures.'] },
+  mission: { title: '📋 Journal de mission', body: ['Les missions vous apprennent le jeu pas à pas et rapportent des Miles ✈️.', 'Le bouton à toucher clignote en jaune.'] },
+  daily: { title: '🎁 Cadeau du jour', body: ['Revenez chaque jour : la récompense grandit sur 7 jours. Un jour manqué remet la série à 1.'] },
+  quests: { title: '📅 Quêtes du jour', body: ['3 nouvelles quêtes chaque jour. Validez les 3 pour ouvrir le coffre bonus.'] },
+  season: { title: '🎉 Événement saisonnier', body: ['Pendant l’événement, chaque vol rapporte des points ; les vols vers le pays de l’événement en donnent deux fois plus.', 'Récupérez les paliers avant la fin.'] },
+  achievements: { title: '🏆 Succès', body: ['Des objectifs à long terme qui rapportent des Miles.'] },
+  social: { title: '👋 Amis', body: ['Échangez vos codes ami pour vous envoyer un cadeau par jour et visiter vos aéroports (petit bonus de pièces).', 'Le classement de la semaine compare les pièces gagnées ; le podium rapporte des Miles le lundi.', 'Le serveur social n’est pas encore en ligne : aucun code ne peut être trouvé pour l’instant.'] },
+};
