@@ -1,5 +1,5 @@
-import { COUNTRY_BY_ID, RING_DISTANCES } from './data/countries';
-import { DESTINATIONS_PER_COUNTRY, DESTINATION_WINDOW_MS, MODIFIER_INFO, MYSTERY_CHANCE } from './formulas';
+import { COUNTRIES, COUNTRY_BY_ID, RING_DISTANCES } from './data/countries';
+import { DESTINATIONS_PER_COUNTRY, DESTINATION_WINDOW_MS, FEATURED, MODIFIER_INFO, MYSTERY_CHANCE, WEEK_MS } from './formulas';
 import { hashString, mulberry32, pick, pickWeighted } from './rng';
 import type { CountryId, Destination, DestinationModifier } from './types';
 
@@ -33,4 +33,14 @@ export function destinationsFor(seed: number, countryId: CountryId, now: number)
 /** Milliseconds until the destinations are regenerated. */
 export function msUntilNewDestinations(now: number): number {
   return DESTINATION_WINDOW_MS - (now % DESTINATION_WINDOW_MS);
+}
+
+/** Country of the week, the same for every player (weeks start on Monday 00:00 UTC). */
+export function featuredCountry(now: number): CountryId {
+  const week = Math.floor((now - 4 * 24 * 3600 * 1000) / WEEK_MS); // 1970-01-01 was a Thursday
+  return COUNTRIES[((week % COUNTRIES.length) + COUNTRIES.length) % COUNTRIES.length].id;
+}
+
+export function featuredMult(countryId: CountryId, now: number): { coins: number; resource: number; vipChance: number } {
+  return featuredCountry(now) === countryId ? FEATURED : { coins: 1, resource: 1, vipChance: 1 };
 }

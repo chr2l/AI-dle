@@ -1,6 +1,6 @@
 // Shop fusion and blueprints (GDD §4.6).
 import { RARITY_INFO, SHOPS, SHOP_BY_ID, type ShopDef } from './data/shops';
-import { type Result, addStar } from './engine';
+import { type Result, addStar, recordAlbum } from './engine';
 import { FUSION_LEVEL, fusionCost, fusionDuration } from './formulas';
 import { type Rng, pickWeighted } from './rng';
 import type { GameState } from './types';
@@ -40,6 +40,7 @@ export function placePlan(state: GameState, planIndex: number, floorIndex: numbe
   if (!floor || floor.buildEndsAt !== undefined) return fail("Cet étage n'est pas construit.");
   if (floor.shop) return fail('Cet étage a déjà un magasin.');
   floor.shop = { defId, level: 1, stars: 1, stock: 0 };
+  recordAlbum(state, defId);
   state.plans.splice(planIndex, 1);
   state.stats.shopsOpened++;
   return { ok: true, value: undefined };

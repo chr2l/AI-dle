@@ -48,11 +48,13 @@ import {
   xpToNext,
 } from './formulas';
 import { type Rng, hashString, pick, pickWeighted, uid } from './rng';
+import { featuredMult } from './destinations';
 import { newPlane } from './state';
 import {
   affinityCount,
   arrivalRate,
   carnetBonus,
+  prestigeMult,
   countryVipDemand,
   crewOf,
   crewXpBonus,
@@ -237,6 +239,10 @@ function isBuilt(state: GameState, index: number): boolean {
   return !!floor && floor.buildEndsAt === undefined;
 }
 
+export function recordAlbum(state: GameState, defId: string) {
+  if (!state.album.includes(defId)) state.album.push(defId);
+}
+
 function drawShop(state: GameState, category: ShopCategory, rng: Rng, exclude?: string): string | undefined {
   const pool = shopPool(state, category).filter((d) => d.id !== exclude);
   if (pool.length === 0) return undefined;
@@ -254,6 +260,7 @@ export function openShop(state: GameState, floorIndex: number, category: ShopCat
   const defId = drawShop(state, category, rng);
   if (!defId) return fail('Aucun magasin disponible dans cette catégorie.');
   floor.shop = { defId, level: 1, stars: 1, stock: 0 };
+  recordAlbum(state, defId);
   state.stats.shopsOpened++;
   return ok(defId);
 }
@@ -273,6 +280,7 @@ export function rerollShop(state: GameState, floorIndex: number, payment: Paymen
   const category = SHOP_BY_ID[shop.defId].category;
   const defId = drawShop(state, category, rng, shop.defId) ?? shop.defId;
   floor.shop = { defId, level: 1, stars: 1, stock: 0 };
+  recordAlbum(state, defId);
   floor.rerollUsed = true;
   return ok(defId);
 }
@@ -651,9 +659,9 @@ export function collectFlight(state: GameState, planeUid: string, now: number, r
     destName: dest.name,
     passengers: flight.passengers,
     coins: Math.round(
-      ticketIncome(dest.distance, flight.passengers, stats.comfort) * (1 + stats.ticketPct + carnetBonus(state)) * mod.coins * affinity,
+      ticketIncome(dest.distance, flight.passengers, stats.comfort) * (1 + stats.ticketPct + carnetBonus(state)) * mod.coins * affinity * prestigeMult(state) * featuredMult(dest.countryId, now).coins,
     ),
-    resource: Math.round(resourceIncome(flight.passengers, ring) * mod.resource * (1 + resourceBonus(state, dest.countryId)) * affinity),
+    resource: Math.round(resourceIncome(flight.passengers, ring) * mod.resource * (1 + resourceBonus(state, dest.countryId)) * affinity * featuredMult(dest.countryId, now).resource),
     xp: flightXp(ring),
     crewXp: flightCrewXp(ring),
     vips: [],

@@ -66,5 +66,11 @@ export function createInitialState(now: number, seed = Math.floor(Math.random() 
 
     facadeColor: '#f2e8d5',
     lobbyColor: '#d6e4f0',
+
+    prestige: { stars: 0, count: 0, runStartedAt: now },
+    album: [],
+    daily: { streak: 0, claimedDay: -1 },
+    quests: { day: -1, ids: [], base: {}, claimed: [], chestClaimed: false },
+    achievements: [],
   };
 }

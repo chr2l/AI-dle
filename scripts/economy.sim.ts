@@ -37,8 +37,10 @@ import { createInitialState } from '../src/core/state';
 import { loungeCap, planeStats, totalShopRate } from '../src/core/stats';
 import type { Destination, GameState, StatKey } from '../src/core/types';
 import { useVip } from '../src/core/visitors';
+import { achievementViews, claimAchievement, claimDaily, claimQuest, claimQuestChest, questViews } from '../src/core/retention';
+import { canFranchise, franchise, pendingStars } from '../src/core/prestige';
 
-const DAYS = 10;
+const DAYS = 30;
 /** Player sessions: `SESSION_MIN` minutes online every `GAP_MIN` minutes, 8 h of sleep per day. */
 const SESSION_MIN = 10;
 const GAP_MIN = 90;
@@ -170,7 +172,8 @@ function playSession(state: GameState, now: number, leaving: boolean) {
 }
 
 test('economy pacing', () => {
-  const state = createInitialState(T0, 99);
+  let state = createInitialState(T0, 99);
+  const franchises: string[] = [];
   const rows: string[] = [];
   const levelAt: Record<number, number> = {};
   const end = T0 + DAYS * 24 * 3600 * 1000;
@@ -183,10 +186,22 @@ test('economy pacing', () => {
     if (inSession) {
       const leaving = minuteOfDay % GAP_MIN >= SESSION_MIN - STEP_S / 60;
       playSession(state, now, leaving);
+      claimDaily(state, now, rng);
+      questViews(state, now).forEach((q, i) => q.done && !q.claimed && claimQuest(state, i, now));
+      claimQuestChest(state, now);
+      for (const a of achievementViews(state)) if (a.done && !a.claimed) claimAchievement(state, a.def.id);
+      // Franchise once it at least doubles the stars (min. 3).
+      if (canFranchise(state).ok && pendingStars(state) >= Math.max(3, state.prestige.stars)) {
+        const res = franchise(state, now);
+        if (res.ok) {
+          franchises.push(`${((now - T0) / 3600000).toFixed(0)} h (niv ${state.level}, +${pendingStars(state)} ⭐)`);
+          state = res.value;
+        }
+      }
     }
     if (!(state.level in levelAt)) levelAt[state.level] = now;
     if (now >= nextReport) {
-      nextReport += 24 * 3600 * 1000;
+      nextReport += (now - T0 < 7 * 24 * 3600 * 1000 ? 1 : 3) * 24 * 3600 * 1000;
       rows.push(
         [
           `${((now - T0) / 3600000).toFixed(0).padStart(4)} h`,
@@ -199,7 +214,9 @@ test('economy pacing', () => {
           `équipage ${state.crew.length}`,
           `pays ${state.discovered.length}`,
           `recherches ${state.research.length}`,
-          `mission ${state.missionIndex}`,
+          `franchise ${state.prestige.count} (${state.prestige.stars} ⭐)`,
+          `succès ${state.achievements.length}`,
+          `série ${state.daily.streak}`,
         ].join(' · '),
       );
     }
@@ -209,6 +226,7 @@ test('economy pacing', () => {
     'Niveau atteint après (h) :',
     Object.entries(levelAt).map(([l, t]) => `${l}:${((t - T0) / 3600000).toFixed(1)}`).join('  '),
   );
+  console.log('Franchises :', franchises.join(' · '));
   console.log('Miles :', JSON.stringify(Object.entries(milesFrom).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1])));
   console.log('Stats :', JSON.stringify(state.stats));
 });
