@@ -2,12 +2,14 @@ import { describe, expect, it } from 'vitest';
 import { Vector3 } from 'three';
 import { PLANE_MODELS } from '../../src/core/data/planes';
 import { SHOPS } from '../../src/core/data/shops';
+import { VIPS } from '../../src/core/data/vips';
 import { buildLobbyModel, buildRoofModel } from '../../src/render/models/building';
 import { buildFloorModel, FLOOR } from '../../src/render/models/floor';
 import { buildPlaneModel } from '../../src/render/models/plane';
+import { buildVipModel, VIP_LOOKS, VIP_SIZE } from '../../src/render/models/vip';
 import { mix, paletteFor } from '../../src/render/palette';
 import { cubeEdgeTexture, ISO_DIRECTION, snapToPixelGrid } from '../../src/render/pixelRenderer';
-import { buildMeshData, EDGE, EDGE_ATLAS_COLUMNS, FACE_SHADE, faceEdgeMask, VoxelGrid } from '../../src/render/voxel';
+import { buildMeshData, EDGE, EDGE_ATLAS_COLUMNS, FACE_SHADE, faceEdgeMask, srgbToLinear, VoxelGrid } from '../../src/render/voxel';
 
 const FACES_TOP = { dir: [0, 1, 0] as [number, number, number], shade: 1, corners: [[0, 1, 1], [1, 1, 1], [1, 1, 0], [0, 1, 0]] as [number, number, number][] };
 
@@ -24,8 +26,8 @@ describe('VoxelGrid + mesh', () => {
   it('bakes top / left / right shading into vertex colors', () => {
     const data = buildMeshData(new VoxelGrid(1, 1, 1).set(0, 0, 0, 0xffffff));
     const shades = new Set<number>();
-    for (let i = 0; i < data.colors.length; i += 3) shades.add(Number(data.colors[i].toFixed(2)));
-    for (const s of [FACE_SHADE.top, FACE_SHADE.left, FACE_SHADE.right]) expect(shades).toContain(s);
+    for (let i = 0; i < data.colors.length; i += 3) shades.add(Number(data.colors[i].toFixed(3)));
+    for (const s of [FACE_SHADE.top, FACE_SHADE.left, FACE_SHADE.right]) expect(shades).toContain(Number(srgbToLinear(s).toFixed(3)));
   });
 
   it('outlines objects but not the cubes inside one object', () => {
@@ -95,5 +97,22 @@ describe('palette + camera', () => {
     expect(s.dot(ISO_DIRECTION)).toBeCloseTo(p.dot(ISO_DIRECTION));
     expect(s.distanceTo(p)).toBeLessThan(1 / 3);
     expect(snapToPixelGrid(s, 3).distanceTo(s)).toBeCloseTo(0);
+  });
+});
+
+describe('VIP figures', () => {
+  it('gives every VIP a parody nod and a voxel look', () => {
+    for (const vip of VIPS) {
+      expect(vip.nod.length).toBeGreaterThan(10);
+      expect(VIP_LOOKS[vip.id]).toBeDefined();
+      const g = buildVipModel(vip.id);
+      expect([g.width, g.height, g.depth]).toEqual([VIP_SIZE.width, VIP_SIZE.height, VIP_SIZE.depth]);
+      expect(g.count()).toBeGreaterThan(60);
+    }
+  });
+
+  it('makes each VIP silhouette distinct', () => {
+    const shapes = new Set(VIPS.map((v) => Array.from(buildVipModel(v.id).cells).join(',')));
+    expect(shapes.size).toBe(VIPS.length);
   });
 });

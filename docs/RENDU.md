@@ -20,3 +20,9 @@ Chaîne choisie (voir GDD §15-16) : tout est **généré par du code TypeScript
 - Nouveau pays : une entrée dans `COUNTRY_DECOR` ; la palette vient des données.
 - Une pièce faite à la main : MagicaVoxel (.vox) via `VOXLoader` de three.js, puis copie dans une `VoxelGrid`.
 - Vérifier visuellement : capture Playwright de `preview.html` (Chromium lancé avec `--use-angle=swiftshader`).
+
+## VIP
+
+`src/render/models/vip.ts` : figurines « chibi » (grosse tête, petit corps) décrites par un `VipLook` (peau, coiffure, chapeau, détails du visage, tenue, cape, accessoire). Chaque VIP de `src/core/data/vips.ts` est un **clin d'œil parodique** à une figure connue (champ `nod`) : nom détourné, silhouette et accessoire signature, jamais de nom réel ni de copie d'un personnage protégé. Aperçu : `/preview.html?scene=vips` (ou `&vips=rockeur,diva`).
+
+Les couleurs sont écrites en sRGB et converties en linéaire à la cuisson (`srgbToLinear`), sinon le rendu paraît délavé.

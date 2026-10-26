@@ -4,6 +4,7 @@ import type { Element } from '../core/types';
 import { buildLobbyModel, buildRoofModel } from './models/building';
 import { buildFloorModel, FLOOR, type FloorModelOptions } from './models/floor';
 import { buildPlaneModel } from './models/plane';
+import { buildVipModel, VIP_SIZE } from './models/vip';
 import { voxelMaterial } from './pixelRenderer';
 import { buildGeometry, VoxelGrid } from './voxel';
 
@@ -50,4 +51,28 @@ export function buildApron(planes: { model: PlaneModel; livery?: Element }[]): G
     x += model.shape.length * 2 + 4;
   }
   return group;
+}
+
+export const VIP_SPACING = { x: VIP_SIZE.width + 2, z: VIP_SIZE.depth + 6 } as const;
+
+/** VIP figures on a carpet, `columns` per row, rows going back along -z. */
+export function buildVipLineup(ids: string[], columns: number): { group: Group; width: number; depth: number } {
+  const group = new Group();
+  const rows = Math.ceil(ids.length / columns);
+  const width = columns * VIP_SPACING.x;
+  const depth = rows * VIP_SPACING.z;
+  const carpet = new VoxelGrid(width + 2, 1, depth + 2);
+  carpet.box(0, 0, 0, carpet.width - 1, 0, carpet.depth - 1, 0xb3263a);
+  carpet.box(1, 0, 1, carpet.width - 2, 0, carpet.depth - 2, 0xd7263d);
+  const carpetMesh = meshFromGrid(carpet);
+  carpetMesh.position.set(-1, -1, -1);
+  group.add(carpetMesh);
+  ids.forEach((id, i) => {
+    const mesh = meshFromGrid(buildVipModel(id));
+    // First ids in front (largest z) so the line-up reads top to bottom.
+    mesh.position.set((i % columns) * VIP_SPACING.x, 0, depth - (Math.floor(i / columns) + 1) * VIP_SPACING.z + 3);
+    mesh.name = `vip-${id}`;
+    group.add(mesh);
+  });
+  return { group, width, depth };
 }

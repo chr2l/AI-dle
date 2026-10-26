@@ -69,6 +69,10 @@ export class VoxelGrid {
   }
 }
 
+export function srgbToLinear(c: number): number {
+  return c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+}
+
 function toColor(color: number | string): number {
   return typeof color === 'number' ? color : parseInt(color.replace('#', ''), 16);
 }
@@ -164,6 +168,8 @@ export function buildMeshData(grid: VoxelGrid): MeshData {
         const c = grid.get(x, y, z);
         if (c < 0) continue;
         const [r, g, b] = hexToRgb(c);
+        // Colors are authored in sRGB; the renderer works in linear space.
+        const tint = (channel: number, shade: number) => srgbToLinear(channel * shade);
         for (const face of FACES) {
           if (grid.get(x + face.dir[0], y + face.dir[1], z + face.dir[2]) >= 0) continue;
           const base = positions.length / 3;
@@ -171,7 +177,7 @@ export function buildMeshData(grid: VoxelGrid): MeshData {
             // Grow each quad a hair inside its plane so no seam shows between faces.
             const grow = (c: number, axis: number) => (face.dir[axis] === 0 ? (c - 0.5) * SEAM_OVERLAP : 0);
             positions.push(x + cx + grow(cx, 0), y + cy + grow(cy, 1), z + cz + grow(cz, 2));
-            colors.push(r * face.shade, g * face.shade, b * face.shade);
+            colors.push(tint(r, face.shade), tint(g, face.shade), tint(b, face.shade));
           }
           const mask = faceEdgeMask(grid, x, y, z, face);
           const col = mask % EDGE_ATLAS_COLUMNS;
