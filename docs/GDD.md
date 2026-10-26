@@ -293,7 +293,7 @@ Plus tard : AdMob (pubs récompensées) + achats in-app via plugins Capacitor, s
 Revendre l'aéroport pour en ouvrir un dans une nouvelle ville. Gain : **Étoiles d'Alliance** = `√(pièces totales / 1M)`, chacune +5 % revenus permanents. On garde : équipage légendaire, Carnet VIP, technologies cosmétiques.
 
 ## 15. Direction artistique
-- **Voxel 3D** rendu en **basse résolution** puis agrandi sans lissage → pixel art « 3D ».
+- **Voxel 3D en « cube art »** : chaque voxel est un cube net à bords marqués (style par défaut). Un style pixel art (basse résolution agrandie sans lissage) reste disponible.
 - Caméra **orthographique isométrique**, faces ombrées « cuites » (haut clair, gauche moyen, droite sombre) → lisible et très léger sur mobile.
 - Chaque pays a une palette ; les magasins et le mobilier en reprennent les couleurs.
 - UI en surimpression (HTML/CSS), police pixel, format **portrait**.

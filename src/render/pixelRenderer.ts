@@ -1,9 +1,17 @@
-import { Color, MeshBasicMaterial, OrthographicCamera, Scene, Vector3, WebGLRenderer } from 'three';
+import { Color, DataTexture, MeshBasicMaterial, NearestFilter, SRGBColorSpace, OrthographicCamera, Scene, Vector3, WebGLRenderer } from 'three';
+
+/**
+ * - `cube`: crisp full-resolution render, every voxel drawn as a visible cube
+ *   with darkened edges (cube art).
+ * - `pixel`: low-resolution render upscaled without smoothing (pixel art).
+ */
+export type VoxelStyle = 'cube' | 'pixel';
 
 export interface PixelRendererOptions {
-  /** Screen pixels per art pixel (the canvas is scaled up without smoothing). */
+  style?: VoxelStyle;
+  /** Pixel style: screen pixels per art pixel (the canvas is scaled up without smoothing). */
   pixelScale?: number;
-  /** Art pixels per voxel edge, which sets the zoom. */
+  /** Art pixels (CSS pixels in cube style) per voxel edge, which sets the zoom. */
   pixelsPerVoxel?: number;
   background?: string;
 }
@@ -15,16 +23,46 @@ export const ISO_DIRECTION = new Vector3(1, 1, 1).normalize();
 export const voxelMaterial = new MeshBasicMaterial({ vertexColors: true });
 
 /**
- * Renders a three.js scene at low resolution with an orthographic iso
- * camera, then lets the browser upscale the canvas with `image-rendering:
- * pixelated`. The camera is snapped to the art-pixel grid so voxels do not
- * shimmer while the tower scrolls.
+ * Edge texture for the cube style: a darker 1-texel border and a lighter
+ * inner rim on every face, multiplied with the baked vertex colors.
+ */
+export function cubeEdgeTexture(size = 16): DataTexture {
+  const data = new Uint8Array(size * size * 4);
+  for (let y = 0; y < size; y++)
+    for (let x = 0; x < size; x++) {
+      const ring = Math.min(x, y, size - 1 - x, size - 1 - y);
+      const v = ring === 0 ? 168 : ring === 1 && (x === 1 || y === size - 2) ? 255 : 236;
+      data.set([v, v, v, 255], (y * size + x) * 4);
+    }
+  const texture = new DataTexture(data, size, size);
+  texture.magFilter = NearestFilter;
+  texture.minFilter = NearestFilter;
+  texture.colorSpace = SRGBColorSpace;
+  texture.needsUpdate = true;
+  return texture;
+}
+
+let edgeTexture: DataTexture | null = null;
+
+/** Switches every voxel mesh between the cube and pixel looks. */
+export function setVoxelStyle(style: VoxelStyle): void {
+  voxelMaterial.map = style === 'cube' ? (edgeTexture ??= cubeEdgeTexture()) : null;
+  voxelMaterial.needsUpdate = true;
+}
+
+/**
+ * Renders a three.js scene with an orthographic iso camera. In pixel style
+ * the image is drawn at low resolution and upscaled with `image-rendering:
+ * pixelated`, the camera snapped to the art-pixel grid so voxels do not
+ * shimmer while the tower scrolls. In cube style it renders at full
+ * resolution with antialiasing and edged cubes.
  */
 export class PixelRenderer {
   readonly scene = new Scene();
   readonly camera = new OrthographicCamera(-1, 1, 1, -1, -1000, 1000);
   readonly renderer: WebGLRenderer;
   readonly target = new Vector3();
+  readonly style: VoxelStyle;
   pixelScale: number;
   pixelsPerVoxel: number;
   private artWidth = 1;
@@ -34,12 +72,15 @@ export class PixelRenderer {
     readonly canvas: HTMLCanvasElement,
     opts: PixelRendererOptions = {},
   ) {
-    this.pixelScale = opts.pixelScale ?? 3;
-    this.pixelsPerVoxel = opts.pixelsPerVoxel ?? 4;
-    this.renderer = new WebGLRenderer({ canvas, antialias: false, alpha: false });
-    this.renderer.setPixelRatio(1);
+    this.style = opts.style ?? 'cube';
+    const cube = this.style === 'cube';
+    this.pixelScale = cube ? 1 : (opts.pixelScale ?? 3);
+    this.pixelsPerVoxel = opts.pixelsPerVoxel ?? (cube ? 10 : 4);
+    this.renderer = new WebGLRenderer({ canvas, antialias: cube, alpha: false });
+    this.renderer.setPixelRatio(cube ? Math.min(2, globalThis.devicePixelRatio ?? 1) : 1);
     this.scene.background = new Color(opts.background ?? '#1b1f3b');
-    canvas.style.imageRendering = 'pixelated';
+    setVoxelStyle(this.style);
+    if (!cube) canvas.style.imageRendering = 'pixelated';
     canvas.style.width = '100%';
     canvas.style.height = '100%';
   }
@@ -61,7 +102,7 @@ export class PixelRenderer {
   }
 
   render(): void {
-    const snapped = snapToPixelGrid(this.target, this.pixelsPerVoxel);
+    const snapped = this.style === 'pixel' ? snapToPixelGrid(this.target, this.pixelsPerVoxel) : this.target.clone();
     this.camera.position.copy(snapped).addScaledVector(ISO_DIRECTION, 100);
     this.camera.lookAt(snapped);
     this.renderer.render(this.scene, this.camera);

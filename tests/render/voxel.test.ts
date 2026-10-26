@@ -6,7 +6,7 @@ import { buildLobbyModel, buildRoofModel } from '../../src/render/models/buildin
 import { buildFloorModel, FLOOR } from '../../src/render/models/floor';
 import { buildPlaneModel } from '../../src/render/models/plane';
 import { mix, paletteFor } from '../../src/render/palette';
-import { ISO_DIRECTION, snapToPixelGrid } from '../../src/render/pixelRenderer';
+import { cubeEdgeTexture, ISO_DIRECTION, snapToPixelGrid } from '../../src/render/pixelRenderer';
 import { buildMeshData, FACE_SHADE, VoxelGrid } from '../../src/render/voxel';
 
 describe('VoxelGrid + mesh', () => {
@@ -24,6 +24,14 @@ describe('VoxelGrid + mesh', () => {
     const shades = new Set<number>();
     for (let i = 0; i < data.colors.length; i += 3) shades.add(Number(data.colors[i].toFixed(2)));
     for (const s of [FACE_SHADE.top, FACE_SHADE.left, FACE_SHADE.right]) expect(shades).toContain(s);
+  });
+
+  it('maps the full texture square on every face for the cube edges', () => {
+    const data = buildMeshData(new VoxelGrid(1, 1, 1).set(0, 0, 0, 0xffffff));
+    expect(data.uvs.length).toBe((data.positions.length / 3) * 2);
+    const tex = cubeEdgeTexture(8);
+    const px = (x: number, y: number) => (tex.image.data as Uint8Array)[(y * 8 + x) * 4];
+    expect(px(0, 4)).toBeLessThan(px(4, 4));
   });
 
   it('ignores writes outside the grid', () => {

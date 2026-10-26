@@ -1,7 +1,7 @@
 /**
  * Visual preview of the voxel pipeline (preview.html): a tower with random
  * shops from every country, a floor under construction and the plane fleet.
- * Query params: ?seed=3&floors=8&scale=3&ppv=4
+ * Query params: ?style=cube|pixel&seed=3&floors=8&scale=3&ppv=10
  */
 import { COUNTRIES } from '../core/data/countries';
 import { PLANE_MODELS } from '../core/data/planes';
@@ -18,8 +18,9 @@ const rand = rng(seed);
 
 const canvas = document.getElementById('scene') as HTMLCanvasElement;
 const view = new PixelRenderer(canvas, {
-  pixelScale: Number(params.get('scale') ?? 3),
-  pixelsPerVoxel: Number(params.get('ppv') ?? 4),
+  style: params.get('style') === 'pixel' ? 'pixel' : 'cube',
+  pixelScale: params.has('scale') ? Number(params.get('scale')) : undefined,
+  pixelsPerVoxel: params.has('ppv') ? Number(params.get('ppv')) : undefined,
 });
 
 const floors = Array.from({ length: floorCount }, (_, i) =>

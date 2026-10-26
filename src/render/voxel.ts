@@ -92,6 +92,8 @@ const FACES: FaceDef[] = [
 export interface MeshData {
   positions: Float32Array;
   colors: Float32Array;
+  /** Each face gets the full 0..1 square, so a texture can draw cube edges. */
+  uvs: Float32Array;
   indices: Uint32Array;
   faceCount: number;
 }
@@ -103,6 +105,7 @@ export interface MeshData {
 export function buildMeshData(grid: VoxelGrid): MeshData {
   const positions: number[] = [];
   const colors: number[] = [];
+  const uvs: number[] = [];
   const indices: number[] = [];
   let faceCount = 0;
   for (let y = 0; y < grid.height; y++)
@@ -118,6 +121,7 @@ export function buildMeshData(grid: VoxelGrid): MeshData {
             positions.push(x + cx, y + cy, z + cz);
             colors.push(r * face.shade, g * face.shade, b * face.shade);
           }
+          uvs.push(0, 0, 1, 0, 1, 1, 0, 1);
           indices.push(base, base + 1, base + 2, base, base + 2, base + 3);
           faceCount++;
         }
@@ -125,6 +129,7 @@ export function buildMeshData(grid: VoxelGrid): MeshData {
   return {
     positions: new Float32Array(positions),
     colors: new Float32Array(colors),
+    uvs: new Float32Array(uvs),
     indices: new Uint32Array(indices),
     faceCount,
   };
@@ -135,6 +140,7 @@ export function buildGeometry(grid: VoxelGrid): BufferGeometry {
   const geometry = new BufferGeometry();
   geometry.setAttribute('position', new BufferAttribute(data.positions, 3));
   geometry.setAttribute('color', new BufferAttribute(data.colors, 3));
+  geometry.setAttribute('uv', new BufferAttribute(data.uvs, 2));
   geometry.setIndex(new BufferAttribute(data.indices, 1));
   geometry.computeBoundingSphere();
   return geometry;
