@@ -142,7 +142,6 @@ export class App {
     const forward = tabs.indexOf(tab) > tabs.indexOf(this.tab);
     this.tab = tab;
     const p = this.root.querySelector<HTMLElement>('#panel')!;
-    p.scrollTop = 0;
     p.classList.remove('from-left', 'from-right');
     void p.offsetWidth;
     p.classList.add(forward ? 'from-right' : 'from-left');
@@ -300,7 +299,6 @@ export class App {
         break;
       case 'vols':
         this.volsView = a[0];
-        this.root.querySelector('#panel')!.scrollTop = 0;
         break;
       case 'close':
         this.closeSheet();
@@ -631,7 +629,10 @@ export class App {
     }
 
     const panel = this.root.querySelector<HTMLElement>('#panel')!;
-    const scrolls = this.saveScroll(panel);
+    // A new tab or sub-view starts at the top.
+    const view = `${this.tab}:${this.volsView}`;
+    const scrolls = panel.dataset.view === view ? this.saveScroll(panel) : new Map<string, number>();
+    panel.dataset.view = view;
     panel.dataset.tab = this.tab;
     panel.innerHTML = { tour: () => this.tour(now), vols: () => this.vols(now), equipe: () => this.equipe(now), amis: () => this.amis(now), objectifs: () => this.objectifs(now) }[this.tab]();
     this.restoreScroll(panel, scrolls);

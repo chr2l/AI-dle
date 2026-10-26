@@ -276,3 +276,6 @@ input#inp:focus { border-color: var(--accent); }
 @keyframes from-left { from { transform: translateX(-30px); opacity: .2; } to { transform: none; opacity: 1; } }
 @keyframes levelup { 0% { transform: translate(-50%, -50%) scale(.3); opacity: 0; } 15% { transform: translate(-50%, -50%) scale(1.15); opacity: 1; } 25% { transform: translate(-50%, -50%) scale(1); } 80% { opacity: 1; } 100% { transform: translate(-50%, -80%); opacity: 0; } }
 @media (prefers-reduced-motion: reduce) { *, *::before { animation-duration: .01s !important; animation-iteration-count: 1 !important; } }
+#tabs button.pulse { animation: none; }
+#tabs button.pulse .ti { animation: tabcall 1.2s infinite; filter: drop-shadow(0 0 6px #ffd23f); }
+@keyframes tabcall { 0%, 100% { transform: translateY(0) scale(1); } 40% { transform: translateY(-6px) scale(1.2); } }
