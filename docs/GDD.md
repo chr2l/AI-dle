@@ -54,6 +54,8 @@ Références assumées :
 | **Ressources régionales** | 🎶 🐚 … | Vols vers le pays correspondant | Recherche du pays |
 | **Réputation (XP)** | ⭐ | Construire, voler, VIP, recherche | Niveau d'aéroport → débloque anneaux, étages, avions |
 
+**Départ** : 300 🪙, 10 ✈️, niveau 1, aucun étage, un Coucou sans équipage, salle d'embarquement niveau 1 (30 places). Le premier étage (150 🪙) est donc abordable tout de suite, le second (218 🪙) demande les premières ventes.
+
 ---
 
 ## 4. L'aéroport-tour
@@ -81,7 +83,8 @@ Références assumées :
 
 - Catégories : 🍔 Restauration · 🛍️ Boutique · 🛋️ Détente · 🧳 Services · 🎮 Loisirs.
 - Le pool contient les magasins **neutres** + ceux des pays **découverts** (1er vol) et **recherchés**.
-- Relancer le tirage : 5 ✈️ ou 📺 pub (1 fois par étage).
+- Le tirage **évite les magasins déjà présents** dans la tour tant que la catégorie en propose d'autres ; sinon un doublon peut sortir.
+- Relancer le tirage : 5 ✈️ ou 📺 pub (1 fois par étage), seulement tant que le magasin n'a jamais été réapprovisionné ni amélioré. La relance ne peut pas redonner le même magasin.
 - On peut aussi poser un **plan** obtenu par fusion.
 
 ### 4.4 Réapprovisionnement (Tiny Tower)
@@ -95,6 +98,9 @@ Un magasin vend tant qu'il a du stock. Chaque magasin a 3 produits :
 
 Stock (en pièces) = `revenu/s × durée`. Hors ligne, les magasins vendent jusqu'à épuisement → ça incite à lancer le « Gros » avant de partir.
 📺 « Livraison express » : réappro instantané.
+- Le réappro est **gratuit** et ne peut se lancer que sur un **rayon vide** (pas de cumul de stock).
+- Un magasin fraîchement ouvert est vide : premier geste du joueur = lancer un « Petit ».
+- Le stock est figé en pièces au moment où il arrive en rayon ; une amélioration ultérieure fait vendre plus vite le stock restant.
 
 ### 4.5 Revenu d'un magasin
 ```
@@ -114,7 +120,8 @@ revenu/s = base(rareté) × 1.25^(niveau-1) × (1 + 0.5 × (étoiles-1))
 - Le résultat devient un **plan** (inventaire) → à poser sur un étage vide, ou à utiliser comme doublon (+1 étoile).
 
 ### 4.7 Passagers
-- Arrivées : `0.3 + 0.05 × magasins` passagers/s, vers la salle d'embarquement (cap `20 + 10 × niv. salle`).
+- Arrivées : `0.3 + 0.05 × magasins` passagers/s, vers la salle d'embarquement (cap `20 + 10 × niv. salle` + bonus déco, niveau de salle 1 au départ).
+- 🤳 Influenceuse : les arrivées comptent double pendant 10 min.
 - **Guider** (actif) : un passager apparaît parfois dans le hall avec une bulle « étage X » → tap → pourboire (`5 × étage`) et petite chance de 1 ✈️.
 
 ### 4.8 Personnalisation
@@ -169,7 +176,9 @@ Coût d'amélioration : `max(500, prix) × 0.15 × 1.5^niv`.
 | Baleine | 800 | 60 | 6 000 | 3 | 65 | 2 | 250 000 | 10 |
 | Colibri Jet | 950 | 12 | 8 000 | 8 | 70 | 3 | 1.2 M | 14 |
 
-Hangar : 2 places au départ, +1 tous les 3 niveaux.
+Hangar : `2 + ⌊niv. aéroport / 3⌋` places (3 au niv 3, 4 au niv 6…).
+
+**Réparation** (avion endommagé par un événement, il ne peut plus décoller) : `10 % × max(500, prix)` 🪙 et 10 min, ou 📺 pub instantanée. Réduite par la déco 🛩️ (−30 %) et le trait Économe (−25 %).
 
 ### 6.3 Modules (technologies de pays)
 Un module recherché est installable sur autant d'avions qu'on veut (dans la limite des emplacements).
@@ -196,7 +205,18 @@ Bonus caché : un avion équipé du module d'un pays obtient **+15 %** de réuss
 - Rareté C / R / E / L → niveau max 10 / 20 / 30 / 40 et puissance ×1 / ×1.5 / ×2.2 / ×3.
 - Chaque membre a un **élément** (pays) : affinité avec la destination = **+15 % récompenses** et **+15 % réussite** aux événements.
 - 0-2 **traits** aléatoires : Mélomane, Bronzé, Gourmet, Geek, Frileux, Survivaliste, Rêveur, Ignifugé, Chanceux, Lève-tôt, Bavard, Économe, Vétéran…
-- XP à chaque vol.
+- L'affinité est **cumulable** : 3 membres du bon élément = +45 % récompenses et +45 % réussite.
+- Bonus de siège (proportionnels aux **points** = puissance × niveau) :
+
+| Siège | Bonus par point | Exemple C niv 10 (10 pts) | Exemple L niv 40 (120 pts) |
+|---|---|---|---|
+| Pilote | +0,5 % vitesse | +5 % | +60 % |
+| Cabine | +0,1 confort (arrondi bas) | +1 | +12 |
+| Mécano | +0,5 fiabilité | +5 | +60 (plafond 99) |
+
+- Les traits s'appliquent dès que le membre est assis : Lève-tôt (+10 % vitesse), Bavard (+10 % billets), Vétéran (+20 % XP), Chanceux (+5 % réussite partout), traits de pays (±10 % réussite dans ce pays), Économe (−25 % réparation).
+- XP par vol : `10 × anneau` pour chaque membre de l'avion (+ XP d'événement). Niveau suivant : `20 × niv^1.5` XP. Au niveau max l'XP n'est plus comptée.
+- Changer un membre de siège est gratuit, mais impossible pendant un vol. Asseoir un membre libère celui qui occupait le siège.
 
 Recrutement (« Agence ») :
 | Type | Coût | C | R | E | L |
@@ -227,22 +247,42 @@ Distances : anneau 1 `250-700 km`, 2 `1 100-1 700`, 3 `2 500-3 400`, 4 `4 500-7 
 Chaque pays propose **3 destinations** régénérées toutes les **4 h** (graine = joueur + pays + fenêtre de temps) :
 - **Nom** généré par syllabes propres au pays (ex : Mélodia → « Do-Sol-ville », « Port-Arpège »).
 - **Distance** tirée dans l'anneau.
-- **Modificateur** : Calme (—), Festival (+50 % ressource), Ruée (+50 % billets), Tempête (+risque, ×2 récompenses), Mystère (10 % : événement rare garanti).
+- **Modificateur** : d'abord 10 % de chance de **Mystère**, sinon tirage pondéré :
+
+| Modificateur | Poids | Billets | Ressource | Événements |
+|---|---|---|---|---|
+| Calme | 50 | ×1 | ×1 | normaux (70 %) |
+| Festival | 15 | ×1 | ×1.5 | normaux |
+| Ruée | 15 | ×1.5 | ×1 | normaux |
+| Tempête | 10 | ×2 | ×2 | normaux, malus **deux fois plus probables** |
+| Mystère | 10 % | ×1 | ×1 | **toujours** un événement, tiré uniquement parmi les **rares** |
 
 ### 8.3 Vol
 - Durée : `distance / vitesse × 150 s` (aller-retour, ex. 300 km en Coucou ≈ 2 min 30).
 - Départ : prend jusqu'à `capacité` passagers dans la salle + les VIP choisis.
 - Billets : `(5 + 0.05 × distance) × passagers × (1 + 0.04 × confort)`.
 - Ressource : `(5 + 0.5 × passagers) × anneau`.
+- Multiplicateurs des billets : `× (1 + bonus billets)` (modules, déco 📺, trait Bavard, Carnet VIP) `× modificateur × (1 + 0.15 × affinités)`.
+- Multiplicateurs de la ressource : `× modificateur × (1 + 10 % si la 1re techno du pays est recherchée) × (1 + 0.15 × affinités)`.
+- Réputation : `15 × anneau` par vol (+40 par VIP satisfait).
+- Conditions de départ : avion libre et non endommagé, anneau débloqué, autonomie ≥ distance. Les passagers embarqués quittent la salle.
+- Le **premier retour** d'un pays le marque comme **découvert** (son magasin commun entre dans le pool, sa recherche s'ouvre).
+- L'avion attend au tarmac jusqu'à ce que le joueur le **collecte** (geste actif) ; les gains sont crédités à la collecte.
 - 📺 « Vent arrière » : −50 % du temps restant (1 fois par vol).
-- 📺 « Double récolte » au retour.
+- 📺 « Double récolte » au retour : recrédite une fois les pièces et la ressource du vol (hors VIP).
 
 ### 8.4 Événements au retour (70 %)
 Chaque pays a sa table d'événements (+ quelques génériques) :
 - **Bonus** : instantané (ex. « Concert improvisé en cabine : +50 % pourboires »).
 - **Malus** : évitable avec un test de fiabilité (chance d'éviter = `fiabilité × 0.6 %`).
 - **Choix** : 2 options, chacune avec un test de réussite (`base + affinités + traits + module`).
-Résultats possibles : pièces, ressources, Miles, XP équipage, réputation, **avion endommagé** (réparation), **magasin débloqué**, **VIP** qui rentre avec vous.
+Résultats possibles : pièces, ressources, Miles, XP équipage, réputation, **avion endommagé** (réparation), **magasin débloqué**, **VIP** qui rentre avec vous *(pas encore dans les données)*.
+
+Règles de calcul :
+- Les effets « +x % / −x % » s'appliquent aux billets et à la ressource **du vol** (pas aux récompenses VIP) : `pièces × (1 + x)`, jamais en dessous de 0.
+- Bonus de réussite d'une option : `+15 %` par membre ayant l'affinité, traits (pays ou Chanceux), `+15 %` si le module du pays est installé. Une option à 100 % réussit toujours ; le total est plafonné entre 0 et 100 %.
+- Tant qu'un **choix** n'est pas fait, le rapport de vol reste **en attente** : rien n'est crédité (ni pièces, ni XP, ni ressources), l'avion est quand même libre de repartir.
+- Contenu actuel : 6 événements génériques (dont 2 rares) + 4 à 5 par pays (au moins un bonus, un malus et un choix chacun), soit 42 au total.
 
 ---
 
@@ -257,19 +297,22 @@ Résultats possibles : pièces, ressources, Miles, XP équipage, réputation, **
 | 3 | Magasin épique/légendaire dans le pool | 🎻 Luthier |
 
 Découverte : le **premier vol** vers un pays ajoute son magasin commun au pool.
+- Une seule recherche à la fois. Il faut avoir **découvert** le pays et terminé la techno `k-1` avant la techno `k`.
+- Coût payé au lancement ; à la fin : +30 ⭐ et l'effet s'active (magasin dans le pool, module installable, déco et son passif).
+- Exemple Mélodia (anneau 1) : k0 = 15 🎶 + 500 🪙, 1 min ; k3 = 160 🎶 + 4 000 🪙, 15 min 37.
 
 ---
 
 ## 10. Progression d'aéroport
 - XP pour passer au niveau L+1 : `50 × L^1.6`.
-- Gains : étage construit `10 × n`, vol `15 × anneau`, VIP 40, recherche 30, mission variable.
+- Gains : étage construit `10 × n` (à la fin du chantier), vol `15 × anneau`, VIP 40, recherche 30, mission variable.
 - Débloque : anneaux (1/4/8/13), étages (+2/niv), avions, hangar (+1 / 3 niv), fusion (niv 3).
 
 ## 11. Missions (onboarding)
 Chaîne de missions qui guide le joueur et donne des Miles : construire un étage → ouvrir un magasin → réapprovisionner → envoyer un vol → collecter → recruter → assigner l'équipage → améliorer un avion → rechercher → niveau 4 → visiter l'anneau 2 → fusionner → servir un VIP…
 
 ## 12. Hors ligne
-Tout est basé sur des **horodatages** : ventes (jusqu'à épuisement du stock), vols, recherche, constructions, fusion. Arrivées de passagers plafonnées à la salle. Au retour : récapitulatif + 📺 « ×2 gains hors ligne ».
+Tout est basé sur des **horodatages** : ventes (jusqu'à épuisement du stock), vols, recherche, constructions, fusion. Arrivées de passagers plafonnées à la salle. Au retour : récapitulatif (durée, pièces vendues, avions rentrés) + 📺 « ×2 gains hors ligne » (une fois par retour, sur les ventes des magasins).
 
 ## 13. Monétisation (emplacements prévus)
 Toutes les intégrations passent par `src/core/monetization.ts`.
