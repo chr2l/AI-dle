@@ -124,6 +124,10 @@ export interface FlightReport {
   vipCoins: number;
   vipMiles: number;
   vipResource: number;
+  /** A choice event is waiting for the player: rewards are not applied yet. */
+  pending?: boolean;
+  /** « Double récolte » already used. */
+  doubled?: boolean;
   event?: {
     defId: string;
     /** Outcome already decided (bonus/malus) or after the player's choice. */
