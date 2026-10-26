@@ -28,6 +28,8 @@ export interface QuestDef {
   /** Goal, possibly scaled with the airport level. */
   goal: (level: number) => number;
   minLevel?: number;
+  /** Only offered to players who have at least one friend. */
+  needsFriends?: boolean;
 }
 
 export const QUESTS: QuestDef[] = [
@@ -41,6 +43,8 @@ export const QUESTS: QuestDef[] = [
   { id: 'q_coins', text: 'Gagner {n} pièces', stat: 'totalCoins', goal: (l) => 2000 * l * l },
   { id: 'q_fusion', text: 'Lancer {n} fusion', stat: 'fusions', goal: () => 1, minLevel: 3 },
   { id: 'q_research', text: 'Terminer {n} recherche', stat: 'researchDone', goal: () => 1, minLevel: 2 },
+  { id: 'q_gift', text: 'Envoyer {n} cadeaux à vos amis', stat: 'giftsSent', goal: () => 3, needsFriends: true },
+  { id: 'q_visit', text: 'Visiter {n} aéroports amis', stat: 'friendVisits', goal: () => 2, needsFriends: true },
 ];
 export const QUESTS_PER_DAY = 3;
 export const QUEST_MILES = 3;
@@ -77,5 +81,8 @@ export const ACHIEVEMENTS: AchievementDef[] = [
   ...tiers('research', 'Terminer {n} recherches', [4, 16, 32], (s) => s.research.length, [5, 15, 30]),
   ...tiers('legend', 'Recruter {n} équipiers légendaires', [1, 3, 9], (s) => s.crew.filter((c) => c.rarity === 'L').length, [10, 20, 40]),
   ...tiers('franchise', 'Ouvrir {n} franchises', [1, 3, 10, 25], (s) => s.prestige.count, [20, 40, 80, 150]),
+  ...tiers('friends', 'Avoir {n} amis', [1, 5, 20], (s) => s.social.friends.length, [5, 10, 20]),
+  ...tiers('gifts', 'Envoyer {n} cadeaux', [10, 100, 1000], (s) => s.stats.giftsSent, [5, 15, 40]),
+  ...tiers('seasons', 'Gagner {n} trophées saisonniers', [1, 5, 9], (s) => s.season.trophies.length, [10, 30, 80]),
   ...tiers('streak', 'Revenir {n} jours de suite', [7, 30, 100], (s) => s.daily.streak, [10, 30, 100]),
 ];

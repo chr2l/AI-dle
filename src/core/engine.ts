@@ -3,7 +3,8 @@
 // in ms; durations from formulas.ts are in seconds.
 import { COUNTRIES, COUNTRY_BY_ID, RING_LEVELS } from './data/countries';
 import { CREW_RARITY, FIRST_NAMES, LAST_NAMES, PREMIUM_RECRUIT_MILES, RECRUIT_ODDS, ROLES, TRAITS } from './data/crew';
-import { EVENTS, EVENT_BY_ID, type EventDef } from './data/events';
+import { EVENTS, EVENT_BY_ID, SEASON_EVENTS, type EventDef } from './data/events';
+import { activeSeason, addSeasonPoints, seasonFlightPoints } from './calendar';
 import { MAX_STAT_LEVEL, MODULE_BY_ID, PLANE_BY_ID, PLANE_COLORS } from './data/planes';
 import { TECHS, TECH_BY_ID } from './data/research';
 import { RARITY_INFO, RESTOCK_TIERS, SHOP_BY_ID, WALL_COLORS } from './data/shops';
@@ -588,9 +589,11 @@ export function speedUpFlight(state: GameState, planeUid: string, now: number, o
   return done;
 }
 
-function rollEvent(dest: Destination, durationSec: number, mystery: boolean, rng: Rng): EventDef | undefined {
+function rollEvent(dest: Destination, durationSec: number, mystery: boolean, now: number, rng: Rng): EventDef | undefined {
   if (!mystery && rng() >= eventChance(durationSec)) return undefined;
-  const pool = EVENTS.filter(
+  const seasonId = activeSeason(now)?.def.id;
+  const seasonal = mystery ? [] : SEASON_EVENTS.filter((e) => e.season === seasonId);
+  const pool = [...EVENTS, ...seasonal].filter(
     (e) => (e.country === 'any' || e.country === dest.countryId) && !!e.rare === mystery,
   );
   if (pool.length === 0) return undefined;
@@ -611,7 +614,7 @@ function applyOutcome(report: FlightReport, outcome: Outcome) {
 }
 
 /** Credits a finished report (rewards, XP, damage, unlocks). */
-function settle(state: GameState, report: FlightReport) {
+function settle(state: GameState, report: FlightReport, now = state.lastTick) {
   const outcome = report.event?.outcome;
   if (outcome) applyOutcome(report, outcome);
   earn(state, report.coins + report.vipCoins);
@@ -633,6 +636,8 @@ function settle(state: GameState, report: FlightReport) {
       demand: countryVipDemand(state, report.countryId),
     });
   }
+  report.seasonPoints = (report.seasonPoints ?? 0) + (outcome?.seasonPoints ?? 0);
+  addSeasonPoints(state, report.seasonPoints, now);
   report.pending = false;
 }
 
@@ -668,6 +673,7 @@ export function collectFlight(state: GameState, planeUid: string, now: number, r
     vipCoins: 0,
     vipMiles: 0,
     vipResource: 0,
+    seasonPoints: seasonFlightPoints(now, ring, dest.countryId),
   };
 
   // VIP requests (GDD §5.2).
@@ -703,7 +709,7 @@ export function collectFlight(state: GameState, planeUid: string, now: number, r
   const mysteryKey = `mystery:${dest.id}`;
   const mystery = dest.modifier === 'mystere' && state.cooldowns[mysteryKey] === undefined;
   if (mystery) state.cooldowns[mysteryKey] = now + DESTINATION_WINDOW_MS;
-  const event = rollEvent(dest, flightDuration(dest.distance, stats.speed), mystery, rng);
+  const event = rollEvent(dest, flightDuration(dest.distance, stats.speed), mystery, now, rng);
   if (event) {
     report.event = { defId: event.id };
     if (event.kind === 'choice') report.pending = true;
@@ -713,7 +719,7 @@ export function collectFlight(state: GameState, planeUid: string, now: number, r
 
   delete plane.flight;
   state.stats.flightsCollected++;
-  if (!report.pending) settle(state, report);
+  if (!report.pending) settle(state, report, now);
   state.reports.unshift(report);
   state.reports.length = Math.min(state.reports.length, MAX_REPORTS);
   return ok(report);

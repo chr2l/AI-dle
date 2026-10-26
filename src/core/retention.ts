@@ -56,7 +56,7 @@ export function refreshQuests(state: GameState, now: number) {
   const today = dayIndex(now);
   if (state.quests.day === today) return;
   const rng = mulberry32(hashString(`${state.seed}:quests:${today}`));
-  const pool = QUESTS.filter((q) => state.level >= (q.minLevel ?? 1));
+  const pool = QUESTS.filter((q) => state.level >= (q.minLevel ?? 1) && (!q.needsFriends || state.social.friends.length > 0));
   const ids: string[] = [];
   while (ids.length < Math.min(QUESTS_PER_DAY, pool.length)) {
     const q = pool[Math.floor(rng() * pool.length)];

@@ -18,6 +18,8 @@ export interface EventDef {
   weight: number;
   /** Only rolled on "Mystère" destinations. */
   rare?: boolean;
+  /** Only rolled while this seasonal event is running (GDD §19). */
+  season?: string;
   outcome?: Outcome;
   options?: EventOption[];
 }
@@ -361,4 +363,88 @@ export const EVENTS: EventDef[] = [
   },
 ];
 
-export const EVENT_BY_ID = Object.fromEntries(EVENTS.map((e) => [e.id, e])) as Record<string, EventDef>;
+/** Seasonal flight events: added to every pool while their season runs. */
+export const SEASON_EVENTS: EventDef[] = [
+  {
+    id: 's_valentin', country: 'any', season: 'saint_valentin', title: 'Demande en mariage en vol', emoji: '💍', kind: 'choice', weight: 4,
+    text: 'Un passager veut faire sa demande au-dessus des nuages.',
+    options: [
+      {
+        label: "Tamiser les lumières de la cabine", chance: 0.7,
+        success: { text: 'Elle a dit oui ! Toute la cabine applaudit : +40 💌, +30 %.', seasonPoints: 40, coinsMult: 0.3 },
+        fail: { text: 'Elle a dit… « on en reparle ». Ambiance glaciale : −10 %.', coinsMult: -0.1 },
+      },
+      { label: 'Offrir du champagne à tous', chance: 1, success: { text: 'Romantique et coûteux : +15 💌, −10 %.', seasonPoints: 15, coinsMult: -0.1 } },
+    ],
+  },
+  {
+    id: 's_carnaval', country: 'any', season: 'carnaval', title: 'Défilé dans l’allée', emoji: '🎭', kind: 'bonus', weight: 4,
+    text: 'Les passagers ont sorti costumes et confettis.',
+    outcome: { text: 'Quelle fête ! +30 🎭 et +20 %.', seasonPoints: 30, coinsMult: 0.2 },
+  },
+  {
+    id: 's_oeufs', country: 'any', season: 'printemps', title: 'Chasse aux œufs', emoji: '🥚', kind: 'choice', weight: 4,
+    text: 'Des œufs en chocolat sont cachés dans tout l’avion.',
+    options: [
+      {
+        label: 'Fouiller la soute', chance: 0.6,
+        success: { text: 'Un panier entier ! +50 🥚', seasonPoints: 50 },
+        fail: { text: 'Tout a fondu sur les bagages : −15 %.', coinsMult: -0.15 },
+      },
+      { label: 'Laisser les enfants chercher', chance: 1, success: { text: 'Ils en trouvent quelques-uns : +15 🥚, +5 ⭐', seasonPoints: 15, rep: 5 } },
+    ],
+  },
+  {
+    id: 's_musique', country: 'any', season: 'fete_musique', title: 'Bœuf à 10 000 m', emoji: '🎸', kind: 'bonus', weight: 4,
+    text: 'Trois musiciens qui ne se connaissaient pas ont improvisé tout le vol.',
+    outcome: { text: 'Concert mémorable : +30 🎟️ et +30 %.', seasonPoints: 30, coinsMult: 0.3 },
+  },
+  {
+    id: 's_ete', country: 'any', season: 'ete', title: 'Valises de vacanciers', emoji: '🧳', kind: 'choice', weight: 4,
+    text: 'Les soutes débordent de valises, de bouées et de parasols.',
+    options: [
+      {
+        label: 'Tout faire rentrer', chance: 0.55,
+        success: { text: 'Tetris réussi ! +45 🐠 et +20 %.', seasonPoints: 45, coinsMult: 0.2 },
+        fail: { text: 'Une bouée a coincé la porte de soute.', damage: true },
+      },
+      { label: 'Faire payer les bagages en plus', chance: 1, success: { text: '+40 % de recettes, +10 🐠', coinsMult: 0.4, seasonPoints: 10 } },
+    ],
+  },
+  {
+    id: 's_rallye', country: 'any', season: 'rallye', title: 'Pilotes du rallye', emoji: '🏁', kind: 'bonus', weight: 4,
+    text: 'Une équipe de rallye rentre avec ses trophées.',
+    outcome: { text: 'Ils arrosent tout le monde : +35 ⛽ et +20 XP d’équipage.', seasonPoints: 35, crewXp: 20 },
+  },
+  {
+    id: 's_halloween', country: 'any', season: 'halloween', title: 'Passager fantôme', emoji: '👻', kind: 'choice', weight: 4,
+    text: 'Le siège 13B est occupé… par personne. Les plateaux disparaissent un à un.',
+    options: [
+      {
+        label: 'Lui offrir des bonbons', chance: 0.65,
+        success: { text: 'Il vous laisse un sac rempli : +50 🍬', seasonPoints: 50 },
+        fail: { text: 'Il préfère les cris. Panique à bord : −20 %.', coinsMult: -0.2 },
+      },
+      { label: 'Appeler l’exorciste de bord', chance: 1, success: { text: 'Le fantôme part en grommelant : +15 🍬', seasonPoints: 15 } },
+    ],
+  },
+  {
+    id: 's_cyber', country: 'any', season: 'cyber_week', title: 'Promo flash', emoji: '💥', kind: 'bonus', weight: 4,
+    text: 'Le duty free de bord a lancé des soldes géantes.',
+    outcome: { text: 'Ruée sur les gadgets : +30 💾 et +40 %.', seasonPoints: 30, coinsMult: 0.4 },
+  },
+  {
+    id: 's_noel', country: 'any', season: 'noel', title: 'Traîneau en détresse', emoji: '🛷', kind: 'choice', weight: 4,
+    text: 'Un traîneau tiré par des rennes fatigués demande à se faire remorquer.',
+    options: [
+      {
+        label: 'Le remorquer', chance: 0.6,
+        success: { text: 'Le Père Givre vous remercie : +60 🎁 et +5 ✈️', seasonPoints: 60, miles: 5 },
+        fail: { text: 'Les rennes ont mangé le kérosène… avion à réviser.', damage: true },
+      },
+      { label: 'Lui indiquer la route', chance: 1, success: { text: 'Il vous lance un paquet : +20 🎁', seasonPoints: 20 } },
+    ],
+  },
+];
+
+export const EVENT_BY_ID = Object.fromEntries([...EVENTS, ...SEASON_EVENTS].map((e) => [e.id, e])) as Record<string, EventDef>;

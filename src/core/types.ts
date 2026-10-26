@@ -104,6 +104,8 @@ export interface Outcome {
   unlockShop?: string;
   /** A VIP of the visited country comes back with the plane and waits in the hall. */
   vip?: boolean;
+  /** Seasonal currency (only during the event's season). */
+  seasonPoints?: number;
 }
 
 export interface VipResult {
@@ -128,6 +130,8 @@ export interface FlightReport {
   vipResource: number;
   /** A choice event is waiting for the player: rewards are not applied yet. */
   pending?: boolean;
+  /** Seasonal points earned by this flight (event outcome included once settled). */
+  seasonPoints?: number;
   /** « Double récolte » already used. */
   doubled?: boolean;
   event?: {
@@ -163,6 +167,8 @@ export interface GameStats {
   guided: number;
   planesBought: number;
   totalCoins: number;
+  giftsSent: number;
+  friendVisits: number;
 }
 
 export interface GameState {
@@ -212,4 +218,47 @@ export interface GameState {
   daily: { streak: number; claimedDay: number };
   quests: { day: number; ids: string[]; base: Record<string, number>; claimed: boolean[]; chestClaimed: boolean };
   achievements: string[];
+
+  /** Current seasonal event progress (GDD §19). */
+  season: { id: string | null; year: number; points: number; claimed: number[]; trophies: string[] };
+  social: SocialState;
+}
+
+// --- Social (GDD §20) -----------------------------------------------------------
+
+/** What other players can see. Published to the social backend. */
+export interface PublicProfile {
+  code: string;
+  name: string;
+  level: number;
+  stars: number;
+  /** Coins earned during `week`. */
+  weeklyScore: number;
+  week: number;
+  totalCoins: number;
+  carnet: number;
+  album: number;
+  facadeColor: string;
+  lobbyColor: string;
+  /** Up to 10 floors, bottom first, to draw the friend's tower. */
+  floors: { defId: string; level: number }[];
+  updatedAt: number;
+}
+
+export interface Gift {
+  id: string;
+  from: string;
+  fromName: string;
+  to: string;
+  day: number;
+}
+
+export interface SocialState {
+  name: string;
+  code: string;
+  friends: { code: string; profile: PublicProfile; addedAt: number }[];
+  gifts: { day: number; sent: string[]; received: number };
+  visits: { day: number; codes: string[] };
+  week: { index: number; startCoins: number };
+  lastWeek?: { index: number; score: number; rank: number; players: number; claimed: boolean };
 }
