@@ -102,6 +102,8 @@ export interface Outcome {
   crewXp?: number;
   damage?: boolean;
   unlockShop?: string;
+  /** A VIP of the visited country comes back with the plane and waits in the hall. */
+  vip?: boolean;
 }
 
 export interface VipResult {
@@ -124,6 +126,10 @@ export interface FlightReport {
   vipCoins: number;
   vipMiles: number;
   vipResource: number;
+  /** A choice event is waiting for the player: rewards are not applied yet. */
+  pending?: boolean;
+  /** « Double récolte » already used. */
+  doubled?: boolean;
   event?: {
     defId: string;
     /** Outcome already decided (bonus/malus) or after the player's choice. */
@@ -198,4 +204,12 @@ export interface GameState {
 
   facadeColor: string;
   lobbyColor: string;
+
+  // --- Long-term & retention (kept across Franchise) ---------------------------
+  prestige: { stars: number; count: number; runStartedAt: number };
+  /** Every shop ever opened, for the album. */
+  album: string[];
+  daily: { streak: number; claimedDay: number };
+  quests: { day: number; ids: string[]; base: Record<string, number>; claimed: boolean[]; chestClaimed: boolean };
+  achievements: string[];
 }
