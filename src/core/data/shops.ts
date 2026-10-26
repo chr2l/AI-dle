@@ -92,7 +92,20 @@ export const SHOPS: ShopDef[] = [
   s('opera', 'Opéra céleste', '🎭', 'loisir', 'L', ['nuagelande', 'melodia'], ['#f4f0ff', '#c86bfa'], true),
 ];
 
-export const SHOP_BY_ID = Object.fromEntries(SHOPS.map((d) => [d.id, d])) as Record<string, ShopDef>;
+/** Seasonal exclusives (GDD §19): only obtainable as a plan from a seasonal reward track. Not in draws, fusion or album sets. */
+export const SEASON_SHOPS: ShopDef[] = [
+  s('chocolatier', 'Chocolatier des cœurs', '💝', 'resto', 'E', ['gourmandie'], ['#c2185b', '#5d3a1a']),
+  s('bal_masque', 'Bal masqué', '🎭', 'loisir', 'E', ['melodia'], ['#7b1fa2', '#ffd23f']),
+  s('jardin', 'Jardin suspendu', '🌷', 'detente', 'E', ['nuagelande'], ['#9ad5ff', '#ff9ecf']),
+  s('scene_live', 'Scène live', '🎙️', 'loisir', 'L', ['melodia'], ['#1f1f2e', '#ff6fb5']),
+  s('paillote', 'Paillote', '🛖', 'resto', 'E', ['tropicalia'], ['#c19a6b', '#2ec4a6']),
+  s('station', 'Station-service rétro', '⛽', 'service', 'E', ['desolande'], ['#c0662b', '#d9c6a0']),
+  s('manoir', 'Manoir hanté', '🏚️', 'loisir', 'L', ['infernia'], ['#2b0f1e', '#ff8c1a']),
+  s('arcade_neon', 'Arcade néon', '🕹️', 'loisir', 'E', ['bitopia'], ['#ff4fd8', '#3fa7ff']),
+  s('atelier_noel', 'Atelier du Père Givre', '🎅', 'boutique', 'L', ['givrebourg'], ['#c62828', '#ffffff']),
+];
+
+export const SHOP_BY_ID = Object.fromEntries([...SHOPS, ...SEASON_SHOPS].map((d) => [d.id, d])) as Record<string, ShopDef>;
 
 export const RARITY_INFO: Record<Rarity, { name: string; weight: number; rate: number; rank: number; color: string }> = {
   C: { name: 'Commun', weight: 60, rate: 1.0, rank: 1, color: '#b0b8c8' },

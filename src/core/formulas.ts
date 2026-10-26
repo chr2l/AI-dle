@@ -142,5 +142,7 @@ export const ALBUM_SET_BONUS = 0.03;
 export const ALBUM_FUSION_BONUS = 0.1;
 export const DAY_MS = 24 * 3600 * 1000;
 export const WEEK_MS = 7 * DAY_MS;
+/** Monday-based week number (1970-01-01 was a Thursday), shared by the featured country and leaderboards. */
+export const weekIndex = (now: number) => Math.floor((now - 4 * DAY_MS) / WEEK_MS);
 /** Featured country of the week: ×2 resource, +50 % tickets, VIPs twice as likely. */
 export const FEATURED = { coins: 1.5, resource: 2, vipChance: 2 } as const;

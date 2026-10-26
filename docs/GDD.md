@@ -443,7 +443,8 @@ Revendre l'aéroport pour en ouvrir un dans une nouvelle ville.
 - ✅ Hors ligne, sauvegarde, emplacements de monétisation (récompense immédiate)
 - ✅ Franchise (prestige)
 - ✅ Rétention : cadeau quotidien, quêtes du jour, succès, album, pays de la semaine, notifications planifiées (§18)
-- ⏳ Post-MVP : événements saisonniers à thème, classements entre amis, sons, Capacitor (notifications locales réelles), vrais SDK pubs/IAP
+- ✅ Événements saisonniers à thème (§19) et social : amis, cadeaux, visites, classements (§20), côté moteur
+- ⏳ Post-MVP : vrai serveur social, sons, Capacitor (notifications locales réelles), vrais SDK pubs/IAP
 
 ## 18. Durée de vie et rétention
 
@@ -462,7 +463,8 @@ Revendre l'aéroport pour en ouvrir un dans une nouvelle ville.
 | **Succès** à paliers (36) | semaines → mois | ✅ nouveau |
 | **Franchise** (prestige infini) | semaines → mois | ✅ nouveau |
 | **Notifications** planifiées | retour du joueur | ✅ calculées, à brancher (Capacitor) |
-| Événements saisonniers, social (amis, classements) | mois | ⏳ post-MVP |
+| **Événements saisonniers** (9 par an, piste de récompenses, trophées) | mois → années | ✅ nouveau (§19) |
+| **Social** : amis, cadeaux, visites, classement hebdo | jours → mois | ✅ moteur, serveur à brancher (§20) |
 
 ### 18.2 Cadeau quotidien
 Un cadeau par jour (jour UTC), cycle de 7 jours. Manquer un jour fait recommencer le cycle au jour 1.
@@ -474,11 +476,11 @@ Un cadeau par jour (jour UTC), cycle de 7 jours. Manquer un jour fait recommence
 Équipage plein (30) → la recrue est remplacée par des Miles (5 ou 30).
 
 ### 18.3 Quêtes du jour
-- 3 quêtes tirées chaque jour (graine joueur + jour), parmi 10 : collecter `10 + 2 × niv` vols, 8 réappros, 5 améliorations de magasin, 3 améliorations d'avion, guider 3 passagers, utiliser 1 VIP, satisfaire 1 VIP, gagner `2 000 × niv²` pièces, lancer 1 fusion, terminer 1 recherche. Les quêtes impossibles au niveau actuel (fusion avant le niveau 3…) ne sortent pas.
+- 3 quêtes tirées chaque jour (graine joueur + jour), parmi 12 : collecter `10 + 2 × niv` vols, 8 réappros, 5 améliorations de magasin, 3 améliorations d'avion, guider 3 passagers, utiliser 1 VIP, satisfaire 1 VIP, gagner `2 000 × niv²` pièces, lancer 1 fusion, terminer 1 recherche, envoyer 3 cadeaux, visiter 2 aéroports amis. Les quêtes impossibles (cadeaux et visites sans ami,  fusion avant le niveau 3…) ne sortent pas.
 - La progression compte à partir du tirage. Chaque quête : 3 ✈️ + `200 × niv` 🪙. Les trois réclamées : **coffre** de 5 ✈️ (14 ✈️ par jour au total).
 
 ### 18.4 Succès
-36 succès en paliers, de quelques heures à plusieurs mois de jeu : étages (10 → 100), vols (100 → 50 000), pièces (1 M → 1 000 Md), VIP différents (5 → 16), album (10 → 43), pays (2 → 8), recherches (4 → 32), légendaires (1 → 9), Franchises (1 → 25), série quotidienne (7 → 100 jours). Récompense : 3 à 150 ✈️ (≈ 1 000 ✈️ au total).
+45 succès en paliers, de quelques heures à plusieurs mois de jeu : étages (10 → 100), vols (100 → 50 000), pièces (1 M → 1 000 Md), VIP différents (5 → 16), album (10 → 43), pays (2 → 8), recherches (4 → 32), légendaires (1 → 9), Franchises (1 → 25), série quotidienne (7 → 100 jours), amis (1 → 20), cadeaux envoyés (10 → 1 000), trophées saisonniers (1 → 9). Récompense : 3 à 150 ✈️ (≈ 1 200 ✈️ au total).
 
 ### 18.5 Album de magasins
 Chaque magasin ouvert au moins une fois (tirage, relance ou plan) entre dans l'album, qui survit à la Franchise. Une **série complète** donne un bonus permanent de revenus des magasins : +3 % par pays (et pour la série neutre), **+10 %** pour la série des 8 magasins de fusion.
@@ -492,3 +494,61 @@ Au départ du joueur, le jeu calcule les rappels à programmer (`plannedNotifica
 ### 18.8 Miles gagnés sans payer (simulation, joueur assidu)
 ~30 ✈️ par jour en régime établi (quêtes 14, cadeau ~2, succès, Millionnaire, événements rares), soit une recrue premium par jour ou de quoi accélérer les chronos clés. Les pubs (30 / jour) et les packs viennent en plus.
 
+## 19. Événements saisonniers
+
+Neuf événements à thème par an, aux mêmes dates pour tous (UTC). Un seul à la fois ; hors saison, la bannière annonce le prochain (`nextSeason`).
+
+| Événement | Dates | Pays à thème | Monnaie affichée | Magasin exclusif |
+|---|---|---|---|---|
+| 💘 Fête des amoureux | 7 → 21 févr. | Gourmandie | 💌 Lettres d'amour | 💝 Chocolatier des cœurs (E) |
+| 🎭 Carnaval | 1 → 14 mars | Mélodia | 🎭 Masques | 🎭 Bal masqué (E) |
+| 🌷 Fête du printemps | 1 → 21 avr. | Nuagelande | 🥚 Œufs | 🌷 Jardin suspendu (E) |
+| 🎸 Fête de la musique | 14 → 28 juin | Mélodia | 🎟️ Billets de concert | 🎙️ Scène live (L) |
+| 🏖️ Grandes vacances | 10 juil. → 25 août | Tropicalia | 🐠 Poissons-clowns | 🛖 Paillote (E) |
+| 🏁 Rallye des dunes | 15 → 30 sept. | Désolande | ⛽ Bidons | ⛽ Station-service rétro (E) |
+| 🎃 Halloween | 20 oct. → 3 nov. | Infernia | 🍬 Bonbons | 🏚️ Manoir hanté (L) |
+| 💾 Semaine du Cyber | 20 nov. → 2 déc. | Bitopia | 💾 Disquettes | 🕹️ Arcade néon (E) |
+| 🎄 Noël polaire | 10 déc. → 6 janv. | Givrebourg | 🎁 Paquets | 🎅 Atelier du Père Givre (L) |
+
+**Points de saison** (la monnaie affichée change selon l'événement, le compteur est le même) :
+- chaque vol récupéré : `2 × anneau`, **doublé** vers le pays à thème ;
+- un **événement de vol saisonnier** (1 par saison, poids 4, tous pays, jamais sur une destination Mystère) entre dans le tirage habituel des événements et donne 10 à 60 points selon le choix.
+
+**Piste de récompenses** (remise à zéro à chaque saison) :
+
+| Points | 50 | 150 | 300 | 600 | 1 000 | 1 600 | 2 500 | 4 000 |
+|---|---|---|---|---|---|---|---|---|
+| Récompense | 5 ✈️ | 2 000 🪙 × niv | recrue standard | 10 ✈️ | **plan du magasin exclusif** | recrue premium | 25 ✈️ | **trophée** + 40 ✈️ |
+
+- Rythme visé : un joueur assidu (~100 vols par jour, anneau 2, un tiers vers le pays à thème) fait ≈ 530 points par jour et finit la piste en ~8 jours ; un joueur occasionnel atteint le magasin exclusif (1 000) en 1 semaine environ. Les saisons durent 2 à 7 semaines.
+- Le magasin exclusif arrive en **plan** (à placer sur un étage libre ou à utiliser comme étoile s'il est déjà ouvert). Il n'est jamais tiré au hasard ni produit par fusion, et il ne compte pas dans les séries de l'album (§18.5) : rater une saison ne bloque aucune collection.
+- Les **trophées** (`halloween-2026`…) sont gardés pour toujours, Franchise comprise, et affichés sur le profil public. Succès dédiés (1 / 5 / 9 trophées).
+- Équipage plein : la recrue devient 5 ou 30 ✈️, comme pour le cadeau quotidien.
+
+## 20. Social
+
+Le moteur reste jouable hors ligne : tout passe par une interface `SocialBackend` (publier son profil, lire ceux des amis, livrer et récupérer les cadeaux, top mondial). `MemorySocialBackend` sert au développement et aux tests ; un vrai serveur (Firebase, Supabase ou un Worker) s'y branchera sans toucher au moteur.
+
+### 20.1 Profil et code ami
+- Chaque joueur a un **code ami** stable tiré de sa graine (`IP-XXXX-XXXX`, sans 0/O/1/I) et un nom (2 à 20 caractères, modifiable).
+- **Profil public** publié à chaque ouverture et toutes les 10 min de jeu : nom, niveau, étoiles de Franchise, score de la semaine, pièces totales, Carnet, album, couleurs de façade et de hall, 10 premiers étages (magasin + niveau). Il suffit à dessiner la tour d'un ami en visite.
+
+### 20.2 Amis
+- On ajoute un ami avec son code (ou un lien de partage). 50 amis au maximum, pas soi-même, pas deux fois.
+
+### 20.3 Cadeaux
+- **1 cadeau par ami et par jour**, gratuit à envoyer. Le destinataire l'ouvre à sa prochaine connexion : `150 × niv` 🪙 chacun, **10 ouverts par jour** au plus (les autres attendent le lendemain).
+- Quête du jour « Envoyer 3 cadeaux », succès 10 / 100 / 1 000 cadeaux.
+
+### 20.4 Visites
+- Visiter la tour d'un ami (vue 3D en lecture seule à partir de son profil) laisse un **pourboire** : `50 × niv` 🪙 et 10 % de chance d'1 ✈️, une fois par ami et par jour.
+- Quête du jour « Visiter 2 aéroports amis ».
+
+### 20.5 Classements
+- **Score de la semaine** = pièces gagnées depuis lundi 00 h UTC (même semaine que le pays à l'honneur). Juste entre petits et gros joueurs ? Non : il favorise les tours avancées, d'où un classement **entre amis** en priorité.
+- **Classement entre amis** (soi + amis ayant publié cette semaine). Le lundi suivant, récompense selon le rang : **1er 30 ✈️, 2e 20, 3e 10, autres 5** (il faut au moins un ami classé).
+- **Top mondial** de la semaine fourni par le serveur (`topWeekly`), sans récompense pour l'instant (anti-triche à prévoir côté serveur avant d'en mettre).
+- Plus tard : ligues par niveau, classement par saison.
+
+### 20.6 Ce qui reste à faire
+Serveur réel et authentification, lien de partage du code, écran de visite 3D, modération des noms, notifications « X vous a envoyé un cadeau ».

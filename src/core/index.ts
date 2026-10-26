@@ -12,3 +12,6 @@ export * from './game';
 export * from './save';
 export * from './retention';
 export * from './prestige';
+export * from './calendar';
+export * from './seasons';
+export * from './social';
