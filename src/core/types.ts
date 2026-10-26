@@ -102,6 +102,8 @@ export interface Outcome {
   crewXp?: number;
   damage?: boolean;
   unlockShop?: string;
+  /** A VIP of the visited country comes back with the plane and waits in the hall. */
+  vip?: boolean;
 }
 
 export interface VipResult {

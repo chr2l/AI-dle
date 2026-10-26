@@ -54,6 +54,8 @@ Références assumées :
 | **Ressources régionales** | 🎶 🐚 … | Vols vers le pays correspondant | Recherche du pays |
 | **Réputation (XP)** | ⭐ | Construire, voler, VIP, recherche | Niveau d'aéroport → débloque anneaux, étages, avions |
 
+**Accélérer avec des Miles** : tout chrono (chantier, réappro, recherche, fusion, vol, réparation) se termine immédiatement pour **1 ✈️ par tranche de 10 min restantes** (minimum 1). Une recherche de 15 min coûte donc 2 ✈️, un réappro « Gros » 2 ✈️.
+
 **Départ** : 300 🪙, 10 ✈️, niveau 1, aucun étage, un Coucou sans équipage, salle d'embarquement niveau 1 (30 places). Le premier étage (150 🪙) est donc abordable tout de suite, le second (218 🪙) demande les premières ventes.
 
 ---
@@ -68,8 +70,8 @@ Références assumées :
 
 ### 4.2 Construire un étage
 - Coût : `150 × 1.45^(n-1)` pièces (n = numéro du futur étage).
-- Durée : `15 s × n^1.3` (max 6 h). Accélérable (Miles ou 📺 pub).
-- Étages max : `4 + 2 × niveau d'aéroport`.
+- Durée : `15 s × n^1.3` (max 6 h, jamais atteint en pratique : l'étage 40 prend 30 min). Accélérable (Miles ou 📺 pub). Un seul chantier à la fois.
+- Étages max : `6 + 3 × niveau d'aéroport` (9 au départ). En fin de partie, c'est le **coût exponentiel** (étage 30 ≈ 7,2 M, étage 40 ≈ 295 M) qui freine, pas ce plafond.
 
 ### 4.3 Ouvrir un magasin (tirage)
 Étage vide → choisir une **catégorie** → tirage pondéré dans le **pool** de cette catégorie.
@@ -117,15 +119,20 @@ revenu/s = base(rareté) × 1.25^(niveau-1) × (1 + 0.5 × (étoiles-1))
 - Débloquée au niveau 3. Choisir 2 magasins (ils ne sont pas consommés).
 - Résultat possible : tout magasin dont les éléments ⊆ éléments(A) ∪ éléments(B), pondéré par rareté ; les magasins **à double élément** ne s'obtiennent **que** par fusion.
 - Coût : `300 × (rang A + rang B)` pièces (rang C=1…L=4). Durée : `2 min × (rang A + rang B)`.
-- Le résultat devient un **plan** (inventaire) → à poser sur un étage vide, ou à utiliser comme doublon (+1 étoile).
+- Le résultat devient un **plan** (inventaire) → à poser sur un étage vide, ou à utiliser comme doublon (+1 étoile, sur un étage portant le même magasin).
+- Le résultat est tiré parmi **tous** les magasins compatibles, y compris ceux pas encore dans le pool du tirage : la fusion est un raccourci vers les magasins rares et épiques des pays. Exemple : Disquaire 🎵 + Bar à smoothies 🌴 → magasins neutres, de Mélodia, de Tropicalia, ou Beach party.
+- Une seule fusion à la fois. La recette est fixée (et payée) au lancement ; le plan arrive à la fin du chrono.
 
 ### 4.7 Passagers
 - Arrivées : `0.3 + 0.05 × magasins` passagers/s, vers la salle d'embarquement (cap `20 + 10 × niv. salle` + bonus déco, niveau de salle 1 au départ).
+- **Agrandir la salle** : `400 × 2^(niv-1)` 🪙, niveau max 10 (110 places). Utile quand la salle est pleine entre deux vols.
 - 🤳 Influenceuse : les arrivées comptent double pendant 10 min.
-- **Guider** (actif) : un passager apparaît parfois dans le hall avec une bulle « étage X » → tap → pourboire (`5 × étage`) et petite chance de 1 ✈️.
+- **Guider** (actif) : un passager apparaît parfois dans le hall avec une bulle « étage X » → tap → pourboire (`5 × étage`) et 5 % de chance de 1 ✈️.
+  - Un test toutes les 30 s : 25 % de chance qu'un passager apparaisse (s'il n'y en a pas déjà un), vers un étage qui a un magasin. Il attend 1 min.
+  - Se tromper d'étage le fait repartir sans pourboire.
 
 ### 4.8 Personnalisation
-- Couleur de mur par étage, couleur de façade, sol du hall.
+- Couleur de mur par étage (palette de 8 teintes), couleur de façade et sol du hall (couleur libre). Tout est **gratuit** et instantané.
 - **Décorations du hall** (débloquées par la recherche) : visibles en 3D + bonus passif.
 - Ordre des étages (échange) → adjacences.
 
@@ -151,6 +158,17 @@ Attirés par les magasins d'un pays. Ils attendent **30 min** en salle d'embarqu
 - module requis : le module du pays **s'il est recherché** (ex : le Rockeur veut un 🪩 Dancefloor).
 
 Satisfait → `500 × 3^(anneau-1)` 🪙, `20 × anneau` ressource, 3 ✈️, 40 ⭐, et une entrée au **Carnet** (+1 % pièces par VIP unique servi).
+
+Non satisfait (mauvais pays, confort trop bas, module manquant) → rien, et le VIP repart. Dans les deux cas il quitte la salle.
+
+### 5.3 Apparition
+- Un test par minute (hors ligne : 10 tests au plus au retour) :
+  - VIP à pouvoir : `0,5 % × magasins neutres`, plafonné à 5 % ;
+  - pour chaque pays dont l'anneau est débloqué : `1 % × magasins de ce pays`, plafonné à 5 % (un magasin à double élément compte pour ses deux pays).
+  - Soit au plus ~3 VIP à pouvoir par heure de jeu : le Millionnaire reste une surprise, pas une rente.
+- Chances ×(1 + 30 %) avec la déco 🔥 Brasero éternel.
+- **4 VIP au plus** attendent en même temps. Un VIP embarqué dans un vol ne repart pas à l'expiration.
+- Effets précis : 📦 Livreur = réappro « Petit » instantané de tous les rayons vides ; 🎤 Influenceuse cumulable (+10 min) ; 🎧 Contrôleur = −50 % du temps restant de chaque vol, sans consommer le « Vent arrière » ; un VIP sans effet possible (aucun chantier, aucun rayon vide, aucun vol) reste dans le hall.
 
 ---
 
@@ -215,6 +233,7 @@ Bonus caché : un avion équipé du module d'un pays obtient **+15 %** de réuss
 | Mécano | +0,5 fiabilité | +5 | +60 (plafond 99) |
 
 - Les traits s'appliquent dès que le membre est assis : Lève-tôt (+10 % vitesse), Bavard (+10 % billets), Vétéran (+20 % XP), Chanceux (+5 % réussite partout), traits de pays (±10 % réussite dans ce pays), Économe (−25 % réparation).
+- Effectif max : **30** membres. Renvoyer un membre est gratuit (rien n'est remboursé).
 - XP par vol : `10 × anneau` pour chaque membre de l'avion (+ XP d'événement). Niveau suivant : `20 × niv^1.5` XP. Au niveau max l'XP n'est plus comptée.
 - Changer un membre de siège est gratuit, mais impossible pendant un vol. Asseoir un membre libère celui qui occupait le siège.
 
@@ -245,7 +264,7 @@ Distances : anneau 1 `250-700 km`, 2 `1 100-1 700`, 3 `2 500-3 400`, 4 `4 500-7 
 
 ### 8.2 Destinations (procédurales)
 Chaque pays propose **3 destinations** régénérées toutes les **4 h** (graine = joueur + pays + fenêtre de temps) :
-- **Nom** généré par syllabes propres au pays (ex : Mélodia → « Do-Sol-ville », « Port-Arpège »).
+- **Nom** généré par syllabes propres au pays = préfixe + suffixe (ex : Mélodia → « Arpège-sur-Gamme », « Tempoville », « Vibraphonie » ; Infernia → « Brais-du-Gouffre », « Lucifgehenne »).
 - **Distance** tirée dans l'anneau.
 - **Modificateur** : d'abord 10 % de chance de **Mystère**, sinon tirage pondéré :
 
@@ -255,7 +274,7 @@ Chaque pays propose **3 destinations** régénérées toutes les **4 h** (graine
 | Festival | 15 | ×1 | ×1.5 | normaux |
 | Ruée | 15 | ×1.5 | ×1 | normaux |
 | Tempête | 10 | ×2 | ×2 | normaux, malus **deux fois plus probables** |
-| Mystère | 10 % | ×1 | ×1 | **toujours** un événement, tiré uniquement parmi les **rares** |
+| Mystère | 10 % | ×1 | ×1 | le **premier** vol vers cette destination a **toujours** un événement rare ; les vols suivants vers la même destination sont normaux (sinon on enchaîne les trésors) |
 
 ### 8.3 Vol
 - Durée : `distance / vitesse × 150 s` (aller-retour, ex. 300 km en Coucou ≈ 2 min 30).
@@ -272,11 +291,13 @@ Chaque pays propose **3 destinations** régénérées toutes les **4 h** (graine
 - 📺 « Double récolte » au retour : recrédite une fois les pièces et la ressource du vol (hors VIP).
 
 ### 8.4 Événements au retour (70 %)
+La chance de 70 % vaut pour les vols de **15 min ou plus** ; en dessous elle est proportionnelle à la durée, avec un minimum d'un quart (17,5 %) : `70 % × clamp(durée / 15 min, 0,25, 1)`. Sans cette règle, les allers-retours de 2 min de l'anneau 1 rapportent trop de Miles.
+
 Chaque pays a sa table d'événements (+ quelques génériques) :
 - **Bonus** : instantané (ex. « Concert improvisé en cabine : +50 % pourboires »).
 - **Malus** : évitable avec un test de fiabilité (chance d'éviter = `fiabilité × 0.6 %`).
 - **Choix** : 2 options, chacune avec un test de réussite (`base + affinités + traits + module`).
-Résultats possibles : pièces, ressources, Miles, XP équipage, réputation, **avion endommagé** (réparation), **magasin débloqué**, **VIP** qui rentre avec vous *(pas encore dans les données)*.
+Résultats possibles : pièces, ressources, Miles, XP équipage, réputation, **avion endommagé** (réparation), **magasin débloqué**, **VIP** qui rentre avec vous (un VIP du pays visité arrive dans le hall avec sa demande ; 3 événements le proposent : chef étoilé, pillards, ange).
 
 Règles de calcul :
 - Les effets « +x % / −x % » s'appliquent aux billets et à la ressource **du vol** (pas aux récompenses VIP) : `pièces × (1 + x)`, jamais en dessous de 0.
@@ -304,15 +325,59 @@ Découverte : le **premier vol** vers un pays ajoute son magasin commun au pool.
 ---
 
 ## 10. Progression d'aéroport
-- XP pour passer au niveau L+1 : `50 × L^1.6`.
-- Gains : étage construit `10 × n` (à la fin du chantier), vol `15 × anneau`, VIP 40, recherche 30, mission variable.
-- Débloque : anneaux (1/4/8/13), étages (+2/niv), avions, hangar (+1 / 3 niv), fusion (niv 3).
+- XP pour passer au niveau L+1 : `150 × L²` (150, 600, 1 350… 15 000 pour passer au 11).
+- Gains :
+  - **dépenser rapporte de la réputation** : chaque amélioration de magasin ou d'avion et chaque achat d'avion donne `√coût / 4` ⭐ ; un étage terminé donne `max(10 × n, √coût / 4)`. Les pièces se transforment ainsi toujours en progression, avec des rendements décroissants ;
+  - vol `5 × anneau`, VIP satisfait 40, recherche 30, réputation des événements.
+- Débloque : anneaux (1/4/8/13), étages (+3/niv), avions, hangar (+1 / 3 niv), fusion (niv 3).
+
+### 10.1 Progression entre pays
+
+| Anneau | Niveau | Distances | Premier avion qui y va | Avion dispo au niveau |
+|---|---|---|---|---|
+| 1 | 1 | 250-700 km | Coucou (800 km) | 1 |
+| 2 | 4 | 1 100-1 700 km | Libellule (1 800 km) | 3 |
+| 3 | 8 | 2 500-3 400 km | Albatros (3 500 km) | 6 |
+| 4 | 13 | 4 500-7 500 km | Baleine (6 000 km, ou 7 500+ avec +3 niveaux d'autonomie) puis Colibri Jet (8 000 km) | 10 / 14 |
+
+Chaque avion qui ouvre un anneau est disponible **avant** l'anneau : le joueur l'achète et l'équipe en attendant le niveau.
+
+### 10.2 Rythme mesuré (simulation)
+`npm run simulate` fait jouer un joueur scripté pendant 10 jours (sessions de 16 h par jour, gestion gloutonne : collecter, renvoyer, réapprovisionner, acheter le moins cher utile). Heures de jeu réelles pour atteindre chaque niveau :
+
+| Profil | Niv 4 (anneau 2) | Niv 8 (anneau 3) | Niv 10 | Niv 13 (anneau 4) |
+|---|---|---|---|---|
+| Assidu (10 min toutes les 1 h 30) | 6 h | 31 h | 54 h | 156 h (6,5 jours) |
+| Occasionnel (5 min toutes les 4 h) | 32 h | 124 h (5 jours) | 196 h (8 jours) | > 10 jours |
+
+Revenus du joueur assidu : ~130 🪙/s après 6 h, ~1 700 🪙/s au jour 2, ~8 000 🪙/s au jour 7. Miles gagnés sans pub ni achat : ~160 en 10 jours (missions 46, Millionnaire, événements rares).
+Limite connue : vers le niveau 12-13, les pièces s'accumulent plus vite que les étages ne se construisent → c'est le moment d'introduire la **Franchise** (§14).
 
 ## 11. Missions (onboarding)
-Chaîne de missions qui guide le joueur et donne des Miles : construire un étage → ouvrir un magasin → réapprovisionner → envoyer un vol → collecter → recruter → assigner l'équipage → améliorer un avion → rechercher → niveau 4 → visiter l'anneau 2 → fusionner → servir un VIP…
+Chaîne de missions qui guide le joueur et donne des Miles. Une seule mission active ; la récompense se réclame d'un tap, puis la suivante s'affiche.
+
+| # | Mission | Récompense |
+|---|---|---|
+| 1 | Construire un étage | 2 ✈️ + 100 🪙 |
+| 2 | Ouvrir un magasin | 2 ✈️ |
+| 3 | Réapprovisionner un rayon | 2 ✈️ |
+| 4 | Envoyer un vol | 2 ✈️ |
+| 5 | Collecter un avion | 3 ✈️ |
+| 6 | Avoir 3 étages | 3 ✈️ |
+| 7 | Recruter un équipier | 3 ✈️ + 500 🪙 |
+| 8 | Assigner un équipier | 3 ✈️ |
+| 9 | Améliorer un avion | 3 ✈️ |
+| 10 | Améliorer un magasin | 3 ✈️ |
+| 11 | Terminer une recherche | 5 ✈️ |
+| 12 | Atteindre le niveau 4 | 5 ✈️ |
+| 13 | Visiter un pays de l'anneau 2 | 5 ✈️ |
+| 14 | Fusionner deux magasins | 5 ✈️ |
+| 15 | Satisfaire un VIP | 10 ✈️ |
+
+Total : 56 ✈️, soit presque deux recrutements premium.
 
 ## 12. Hors ligne
-Tout est basé sur des **horodatages** : ventes (jusqu'à épuisement du stock), vols, recherche, constructions, fusion. Arrivées de passagers plafonnées à la salle. Au retour : récapitulatif (durée, pièces vendues, avions rentrés) + 📺 « ×2 gains hors ligne » (une fois par retour, sur les ventes des magasins).
+Tout est basé sur des **horodatages** : ventes (jusqu'à épuisement du stock), vols, recherche, constructions, fusion. Arrivées de passagers plafonnées à la salle. Pas de plafond de durée hors ligne : les magasins s'arrêtent d'eux-mêmes à la fin du stock et les avions attendent d'être collectés. Les apparitions de VIP rattrapent au plus 10 tests (10 min). Au retour : récapitulatif (durée, pièces vendues, avions rentrés) + 📺 « ×2 gains hors ligne » (une fois par retour, sur les ventes des magasins).
 
 ## 13. Monétisation (emplacements prévus)
 Toutes les intégrations passent par `src/core/monetization.ts`.
@@ -328,7 +393,19 @@ Toutes les intégrations passent par `src/core/monetization.ts`.
 | `reroll_shop` | Relance un tirage de magasin |
 | `offline_x2` | ×2 gains hors ligne |
 | `repair` | Réparation instantanée |
-| Boutique (IAP) | Packs de Miles / pièces |
+| Boutique (IAP) | Packs de Miles / pièces (ci-dessous) |
+
+**Limites des pubs** : 30 pubs récompensées par jour au total. Délai par emplacement : `skip_build` 10 min, `restock_express` 5 min, `repair` 10 min ; `tailwind` et `double_collect` une fois par vol, `reroll_shop` une fois par étage, `offline_x2` une fois par retour, `free_recruit` toutes les 4 h.
+
+**Packs (prix indicatifs)** :
+
+| Pack | Prix | Contenu |
+|---|---|---|
+| Poignée de Miles | 1,99 € | 60 ✈️ |
+| Sac de Miles | 4,99 € | 170 ✈️ |
+| Valise de Miles | 9,99 € | 380 ✈️ |
+| Soute de Miles | 19,99 € | 850 ✈️ |
+| Pack de départ (une fois) | 2,99 € | 100 ✈️ + 20 000 🪙 |
 
 Plus tard : AdMob (pubs récompensées) + achats in-app via plugins Capacitor, sans toucher au gameplay.
 
@@ -343,7 +420,7 @@ Revendre l'aéroport pour en ouvrir un dans une nouvelle ville. Gain : **Étoile
 
 ## 16. Technique
 - TypeScript + Vite + Three.js. Logique de jeu pure et testée (`src/core`), rendu (`src/render`), interface (`src/ui`).
-- Sauvegarde locale (`localStorage`), versionnée.
+- Sauvegarde locale (`localStorage`, clé `idleport.save`) toutes les 10 s et à la fermeture, versionnée : chaque nouvelle version ajoute une migration, et les champs absents d'une ancienne sauvegarde sont remplis avec les valeurs de départ. Une sauvegarde illisible ou plus récente que le jeu est ignorée.
 - Packaging mobile prévu via Capacitor (Android / iOS).
 
 ## 17. Périmètre MVP (v0.1)
