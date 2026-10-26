@@ -421,7 +421,7 @@ Revendre l'aéroport pour en ouvrir un dans une nouvelle ville.
 - Rythme mesuré (joueur assidu) : 1re Franchise vers le jour 5 (+20 ⭐, revenus ×2), puis la partie suivante retrouve le niveau 11 en 2 jours et va plus loin (niveau 15 au jour 20, 3 Franchises en 30 jours).
 
 ## 15. Direction artistique
-- **Voxel 3D** rendu en **basse résolution** puis agrandi sans lissage → pixel art « 3D ».
+- **Voxel 3D en « cube art »** : cubes nets avec un contour fin autour des objets seulement (style par défaut). Un style pixel art (basse résolution agrandie sans lissage) reste disponible.
 - Caméra **orthographique isométrique**, faces ombrées « cuites » (haut clair, gauche moyen, droite sombre) → lisible et très léger sur mobile.
 - Chaque pays a une palette ; les magasins et le mobilier en reprennent les couleurs.
 - UI en surimpression (HTML/CSS), police pixel, format **portrait**.
