@@ -416,7 +416,7 @@ Revendre l'aéroport pour en ouvrir un dans une nouvelle ville.
 - Débloquée au **niveau 12**, et seulement si elle rapporte au moins 1 étoile.
 - **Étoiles d'Alliance** sur toute la carrière : `⌊√(pièces gagnées au total / 1 M)⌋`. Une Franchise donne les étoiles gagnées depuis la précédente. Il faut donc 4× plus de pièces pour doubler ses étoiles : la boucle ralentit naturellement.
 - Chaque étoile : **+5 % de revenus** des magasins et des billets, pour toujours.
-- **On garde** : étoiles, Miles (monnaie premium, jamais perdue), équipage **légendaire** (désaffecté), Carnet VIP, album, succès, statistiques de carrière, série quotidienne et quêtes du jour, couleurs, missions d'onboarding terminées.
+- **On garde** : étoiles, Miles (monnaie premium, jamais perdue), équipage **légendaire** (désaffecté), Carnet VIP, album, Dex et compteur de pitié des boîtes, succès, statistiques de carrière, série quotidienne et quêtes du jour, couleurs, missions d'onboarding terminées.
 - **On repart de zéro** : pièces (300), niveau, étages, magasins, avions (un Coucou), équipage non légendaire, ressources, recherches, pays découverts, plans, VIP.
 - Rythme mesuré (joueur assidu) : 1re Franchise vers le jour 5 (+20 ⭐, revenus ×2), puis la partie suivante retrouve le niveau 11 en 2 jours et va plus loin (niveau 15 au jour 20, 3 Franchises en 30 jours).
 
@@ -459,7 +459,8 @@ Revendre l'aéroport pour en ouvrir un dans une nouvelle ville.
 | **Quêtes du jour** (3 + coffre) | jours | ✅ nouveau |
 | **Pays à l'honneur** de la semaine | semaines | ✅ nouveau |
 | Anneaux 1 → 4, recherche (32 technos) | 1-3 semaines | ✅ |
-| Collections : Carnet VIP (16), équipage, étoiles de magasins, **album** (43 magasins) | semaines | ✅ album nouveau |
+| Collections : Carnet VIP (16), équipage, étoiles de magasins, **album** (43 magasins), **Dex** (§23) | semaines | ✅ |
+| **Boîtes de plans** et **pari de rareté** (§22) | minutes → semaines | ✅ moteur |
 | **Succès** à paliers (36) | semaines → mois | ✅ nouveau |
 | **Franchise** (prestige infini) | semaines → mois | ✅ nouveau |
 | **Notifications** planifiées | retour du joueur | ✅ calculées, à brancher (Capacitor) |
@@ -480,7 +481,7 @@ Un cadeau par jour (jour UTC), cycle de 7 jours. Manquer un jour fait recommence
 - La progression compte à partir du tirage. Chaque quête : 3 ✈️ + `200 × niv` 🪙. Les trois réclamées : **coffre** de 5 ✈️ (14 ✈️ par jour au total).
 
 ### 18.4 Succès
-45 succès en paliers, de quelques heures à plusieurs mois de jeu : étages (10 → 100), vols (100 → 50 000), pièces (1 M → 1 000 Md), VIP différents (5 → 16), album (10 → 43), pays (2 → 8), recherches (4 → 32), légendaires (1 → 9), Franchises (1 → 25), série quotidienne (7 → 100 jours), amis (1 → 20), cadeaux envoyés (10 → 1 000), trophées saisonniers (1 → 9). Récompense : 3 à 150 ✈️ (≈ 1 200 ✈️ au total).
+48 succès en paliers, de quelques heures à plusieurs mois de jeu : étages (10 → 100), vols (100 → 50 000), pièces (1 M → 1 000 Md), VIP différents (5 → 16), album (10 → 43), pays (2 → 8), recherches (4 → 32), légendaires (1 → 9), Franchises (1 → 25), série quotidienne (7 → 100 jours), amis (1 → 20), cadeaux envoyés (10 → 1 000), trophées saisonniers (1 → 9), boîtes de plans ouvertes (10 → 500). Récompense : 3 à 150 ✈️ (≈ 1 250 ✈️ au total).
 
 ### 18.5 Album de magasins
 Chaque magasin ouvert au moins une fois (tirage, relance ou plan) entre dans l'album, qui survit à la Franchise. Une **série complète** donne un bonus permanent de revenus des magasins : +3 % par pays (et pour la série neutre), **+10 %** pour la série des 8 magasins de fusion.
@@ -574,3 +575,51 @@ Interface DOM (`src/ui`) au-dessus de la vue cube art, pensée pour le portrait 
 
 - **Retours** : pièces et Miles qui volent vers le compteur, confettis (mission, niveau, déblocage), sons synthétisés (coupables dans le HUD), vibrations légères (Capacitor Haptics), glissement horizontal pour changer d'onglet, pastilles de notification sur les onglets.
 - **Typo** : Nunito (texte) et Lilita One (titres, chiffres), embarquées dans l'APK.
+
+## 22. Gamble : boîtes de plans et pari de rareté
+
+Les magasins ont quatre raretés (Commun 60 %, Rare 28 %, Épique 10 %, Légendaire 2 % au tirage d'un étage). Le tirage normal ne donne que les magasins **communs** des pays découverts (les autres viennent de la recherche, des événements et de la fusion). Le gamble ouvre un autre accès aux raretés hautes, avec un risque.
+
+**Règles d'honnêteté** : probabilités affichées avant chaque achat (`boxOdds`), aucune boîte vendue directement contre de l'argent réel (seulement pièces, Miles gagnés en jeu ou pub), compteur de pitié visible.
+
+### 22.1 Boîtes de plans
+Le magasin gagné arrive en **plan** : à poser sur un étage libre, ou à utiliser comme **étoile** si le même magasin est déjà ouvert (les doublons ont donc toujours une valeur).
+
+| Boîte | Prix | Commun | Rare | Épique | Légendaire |
+|---|---|---|---|---|---|
+| 📦 Caisse de chantier | `250 × niv²` 🪙 ou 5 ✈️, **gratuite avec une pub toutes les 6 h** | 55 % | 32 % | 11 % | 2 % |
+| 🧰 Coffre d'architecte | 15 ✈️ | — | 65 % | 30 % | 5 % |
+| 💼 Malle du magnat | 40 ✈️ | — | — | 80 % | 20 % |
+
+- **Contenu** : magasins neutres et des pays **découverts**, toutes raretés (pas les magasins de fusion ni saisonniers). Si une rareté n'a aucun magasin disponible (ex. pas de légendaire neutre au début), sa part passe à la rareté inférieure ; les probabilités affichées en tiennent compte.
+- **Pitié** : la 30ᵉ boîte d'affilée sans légendaire en donne un (compteur commun à toutes les boîtes, gardé après Franchise).
+- Rythme : ~30 ✈️ par jour sans payer (§18.8) → un coffre d'architecte par jour, ou une malle tous les deux jours (≈ un légendaire par semaine et demie).
+
+### 22.2 Pari de rareté (sur un étage)
+Sur un magasin **neuf** (niveau 1, jamais réapprovisionné), on peut parier pour monter d'une rareté, dans la **même catégorie** :
+
+| Rareté actuelle | Chance (mise sûre) | Chance (mise risquée) | Prix de la mise sûre |
+|---|---|---|---|
+| Commun → Rare | 40 % | — | `200 × niv²` 🪙 |
+| Rare → Épique | 25 % | 37,5 % | `400 × niv²` 🪙 |
+| Épique → Légendaire | 10 % | 15 % | `600 × niv²` 🪙 |
+
+- **Mise sûre** : payée en pièces ; perdu, le magasin ne change pas.
+- **Mise risquée** : gratuite, chance ×1,5 ; perdu, le magasin **descend** d'une rareté. Impossible sur un commun (il ne peut pas descendre).
+- Les paris s'enchaînent tant que le magasin est neuf (Commun → Rare → Épique…). Le magasin obtenu entre dans l'album.
+- Le pari n'est proposé que si un magasin de la rareté visée existe dans la catégorie (pays découverts compris).
+
+## 23. Dex
+
+Une encyclopédie qui regroupe toutes les collections, avec les entrées trouvées et celles qui manquent (silhouette « ? » et un indice pour savoir où chercher).
+
+| Section | Entrées | Trouvée quand… | Indice |
+|---|---|---|---|
+| 🏬 Magasins (étages) | 52 (43 + 9 saisonniers) | ouvert une fois (album) | pays et rareté, recette de fusion, saison |
+| ⭐ VIP | 21 | vu à l'aéroport ou servi (Carnet) | magasins qui l'attirent |
+| ✈️ Avions | 5 | possédé une fois | niveau requis |
+| 🗺️ Pays | 8 | découvert | anneau |
+| 📜 Événements | tous (normaux, rares, saisonniers) | rencontré en vol | pays, Mystère ou saison |
+
+- **Récompenses de complétion**, par section : 25 % → 5 ✈️, 50 % → 10 ✈️, 75 % → 20 ✈️, 100 % → 50 ✈️ (425 ✈️ au total). Un badge indique les récompenses prêtes.
+- Le Dex survit à la Franchise. Le bonus de revenus des séries complètes reste celui de l'album (§18.5).

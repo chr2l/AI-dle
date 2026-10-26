@@ -84,5 +84,6 @@ export const ACHIEVEMENTS: AchievementDef[] = [
   ...tiers('friends', 'Avoir {n} amis', [1, 5, 20], (s) => s.social.friends.length, [5, 10, 20]),
   ...tiers('gifts', 'Envoyer {n} cadeaux', [10, 100, 1000], (s) => s.stats.giftsSent, [5, 15, 40]),
   ...tiers('seasons', 'Gagner {n} trophées saisonniers', [1, 5, 9], (s) => s.season.trophies.length, [10, 30, 80]),
+  ...tiers('boxes', 'Ouvrir {n} boîtes de plans', [10, 100, 500], (s) => s.stats.boxesOpened, [5, 15, 40]),
   ...tiers('streak', 'Revenir {n} jours de suite', [7, 30, 100], (s) => s.daily.streak, [10, 30, 100]),
 ];

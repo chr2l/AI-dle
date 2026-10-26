@@ -169,6 +169,8 @@ export interface GameStats {
   totalCoins: number;
   giftsSent: number;
   friendVisits: number;
+  boxesOpened: number;
+  betsWon: number;
 }
 
 export interface GameState {
@@ -222,6 +224,11 @@ export interface GameState {
   /** Current seasonal event progress (GDD §19). */
   season: { id: string | null; year: number; points: number; claimed: number[]; trophies: string[] };
   social: SocialState;
+
+  /** Plan boxes (GDD §22): boxes opened since the last legendary, for the pity timer. */
+  gamble: { pity: number };
+  /** What the Dex remembers beyond album and Carnet (GDD §23). */
+  dex: { vips: string[]; planes: string[]; events: string[]; claimed: string[] };
 }
 
 // --- Social (GDD §20) -----------------------------------------------------------

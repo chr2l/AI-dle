@@ -35,6 +35,7 @@ export function emptyStats(): GameStats {
     floorsBuilt: 0, shopsOpened: 0, restocks: 0, flightsSent: 0, flightsCollected: 0, recruits: 0,
     crewAssigned: 0, planeUpgrades: 0, shopUpgrades: 0, researchDone: 0, fusions: 0, vipsServed: 0,
     vipsUsed: 0, guided: 0, planesBought: 0, totalCoins: 0, giftsSent: 0, friendVisits: 0,
+    boxesOpened: 0, betsWon: 0,
   };
 }
 
@@ -96,6 +97,8 @@ export function createInitialState(now: number, seed = Math.floor(Math.random() 
     quests: { day: -1, ids: [], base: {}, claimed: [], chestClaimed: false },
     achievements: [],
 
+    gamble: { pity: 0 },
+    dex: { vips: [], planes: [], events: [], claimed: [] },
     season: { id: null, year: 0, points: 0, claimed: [], trophies: [] },
     social: {
       name: defaultPlayerName(seed),
