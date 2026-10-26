@@ -1,15 +1,13 @@
-// Temporary entry point until the renderer and UI land: runs the idle loop
-// and shows the main counters so the engine can be tried in a browser.
-import { createInitialState, load, save, totalShopRate, update } from './core';
+// Entry point: idle loop + the test interface (src/ui).
+import { createInitialState, load, update } from './core';
+import { App } from './ui/app';
 
-const state = load(Date.now()) ?? createInitialState(Date.now());
-const ui = document.getElementById('ui')!;
-
-function frame() {
-  update(state, Date.now());
-  ui.textContent = `🪙 ${Math.floor(state.coins)} · ✈️ ${state.miles} · ⭐ niv. ${state.level} · ${totalShopRate(state).toFixed(1)} 🪙/s`;
-  requestAnimationFrame(frame);
-}
-frame();
-setInterval(() => save(state), 10_000);
-window.addEventListener('pagehide', () => save(state));
+const now = Date.now();
+const saved = load(now);
+const state = saved ?? createInitialState(now);
+const app = new App(state, document.getElementById('ui')!);
+// Catch up on the time spent away before the first frame.
+const offline = update(state, now);
+app.render();
+if (saved) app.showOffline(offline);
+app.start();
