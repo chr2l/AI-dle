@@ -6,3 +6,7 @@ export * from './stats';
 export * from './destinations';
 export * from './engine';
 export * from './monetization';
+export * from './fusion';
+export * from './visitors';
+export * from './game';
+export * from './save';

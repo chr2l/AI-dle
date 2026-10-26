@@ -62,7 +62,7 @@ describe('formulas', () => {
     expect(shopUpgradeCost('L', 1)).toBe(252);
     expect(planeUpgradeCost(0, 0)).toBe(75);
     expect(flightDuration(300, 300)).toBe(150);
-    expect(xpToNext(1)).toBe(50);
+    expect(xpToNext(1)).toBe(150);
   });
 });
 
@@ -80,7 +80,7 @@ describe('tower', () => {
   });
 
   it('refuses floors beyond the level cap', () => {
-    for (let i = 0; i < 6; i++) state.floors.push({});
+    for (let i = 0; i < 9; i++) state.floors.push({});
     state.coins = 1e9;
     expect(buildFloor(state, T0)).toMatchObject({ ok: false });
   });
@@ -164,7 +164,7 @@ describe('tower', () => {
 
 describe('progression', () => {
   it('levels up the airport', () => {
-    expect(addXp(state, 50)).toBe(1);
+    expect(addXp(state, 150)).toBe(1);
     expect(state.level).toBe(2);
     expect(state.xp).toBe(0);
   });

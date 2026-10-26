@@ -1,7 +1,7 @@
 // Derived values computed from the state (never stored in the save).
 import { COUNTRY_BY_ID } from './data/countries';
 import { CREW_RARITY, TRAIT_BY_ID } from './data/crew';
-import { MODULE_BY_ID, PLANE_BY_ID } from './data/planes';
+import { MODULES, MODULE_BY_ID, PLANE_BY_ID } from './data/planes';
 import { DECO_BY_ID, TECH_BY_ID, type DecoDef } from './data/research';
 import { RARITY_INFO, SHOPS, SHOP_BY_ID, type ShopDef } from './data/shops';
 import {
@@ -17,8 +17,9 @@ import {
   UPGRADE_STEP,
   arrivalsPerSec,
   loungeCapacity,
+  vipMinComfort,
 } from './formulas';
-import type { CountryId, CrewMember, CrewRole, GameState, PlaneState, ShopCategory, StatKey } from './types';
+import type { CountryId, CrewMember, CrewRole, GameState, PlaneState, ShopCategory, StatKey, VipState } from './types';
 
 // --- Research effects ----------------------------------------------------------
 
@@ -209,4 +210,13 @@ export function repairBonus(state: GameState, plane: PlaneState): number {
 
 export function ringOf(countryId: CountryId): number {
   return COUNTRY_BY_ID[countryId].ring;
+}
+
+// --- VIP ---------------------------------------------------------------------
+
+export function countryVipDemand(state: GameState, countryId: CountryId): VipState['demand'] {
+  const ring = COUNTRY_BY_ID[countryId].ring;
+  const module = MODULES.find((m) => m.countryId === countryId);
+  const researched = module && researchedModules(state).has(module.id);
+  return { countryId, minComfort: vipMinComfort(ring), moduleId: researched ? module.id : undefined };
 }

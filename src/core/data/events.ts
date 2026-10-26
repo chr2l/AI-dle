@@ -157,7 +157,7 @@ export const EVENTS: EventDef[] = [
     options: [
       {
         label: 'Lui laisser la cuisine', chance: 0.6,
-        success: { text: 'Un repas légendaire ! +5 ✈️ et +10 ⭐', miles: 5, rep: 10 },
+        success: { text: 'Un repas légendaire ! +5 ✈️, +10 ⭐, et une critique gastronomique veut visiter votre aéroport.', miles: 5, rep: 10, vip: true },
         fail: { text: "Un soufflé a explosé dans l'office.", damage: true },
       },
       { label: 'Servir les sandwichs habituels', chance: 1, success: { text: 'Personne ne se plaint. Personne ne se souvient.' } },
@@ -262,7 +262,7 @@ export const EVENTS: EventDef[] = [
     options: [
       {
         label: 'Négocier', chance: 0.5,
-        success: { text: 'Ils deviennent des clients fidèles. −10 %, +15 ⭐', coinsMult: -0.1, rep: 15 },
+        success: { text: 'Ils deviennent des clients fidèles. −10 %, +15 ⭐, et leur cheffe veut voir votre aéroport.', coinsMult: -0.1, rep: 15, vip: true },
         fail: { text: 'Ils prennent un « péage » : −40 %.', coinsMult: -0.4 },
       },
       {
@@ -314,7 +314,7 @@ export const EVENTS: EventDef[] = [
     options: [
       {
         label: "L'aider", chance: 0.7,
-        success: { text: 'Bénédiction ! +10 ✈️ et +20 ⭐', miles: 10, rep: 20 },
+        success: { text: 'Bénédiction ! +10 ✈️, +20 ⭐, et un voyageur céleste rentre avec vous.', miles: 10, rep: 20, vip: true },
         fail: { text: 'Il a mis des plumes partout : −10 %.', coinsMult: -0.1 },
       },
       { label: 'Continuer la route', chance: 1, success: { text: 'Il vous regarde partir avec un air triste.' } },
