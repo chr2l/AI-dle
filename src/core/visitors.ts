@@ -21,6 +21,7 @@ import {
   guideTip,
 } from './formulas';
 import { type Rng, pick, uid } from './rng';
+import { featuredMult } from './destinations';
 import { countryVipDemand, decoBonuses } from './stats';
 import type { CountryId, GameState } from './types';
 
@@ -53,7 +54,7 @@ function spawnVips(state: GameState, now: number, rng: Rng) {
     }
   }
   for (const [countryId, count] of byCountry) {
-    if (waiting() >= MAX_VIPS_WAITING || rng() >= Math.min(MAX_VIP_CHANCE, count * COUNTRY_VIP_CHANCE) * chanceMult) continue;
+    if (waiting() >= MAX_VIPS_WAITING || rng() >= Math.min(MAX_VIP_CHANCE, count * COUNTRY_VIP_CHANCE) * chanceMult * featuredMult(countryId, now).vipChance) continue;
     const defs = VIPS.filter((v) => v.countryId === countryId);
     state.vips.push({
       uid: uid('vip', rng),

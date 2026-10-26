@@ -204,4 +204,12 @@ export interface GameState {
 
   facadeColor: string;
   lobbyColor: string;
+
+  // --- Long-term & retention (kept across Franchise) ---------------------------
+  prestige: { stars: number; count: number; runStartedAt: number };
+  /** Every shop ever opened, for the album. */
+  album: string[];
+  daily: { streak: number; claimedDay: number };
+  quests: { day: number; ids: string[]; base: Record<string, number>; claimed: boolean[]; chestClaimed: boolean };
+  achievements: string[];
 }

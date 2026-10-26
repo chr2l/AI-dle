@@ -10,3 +10,5 @@ export * from './fusion';
 export * from './visitors';
 export * from './game';
 export * from './save';
+export * from './retention';
+export * from './prestige';

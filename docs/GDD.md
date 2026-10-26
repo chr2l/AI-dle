@@ -41,7 +41,8 @@ Références assumées :
 | ~30 s | Guider un passager à son étage (pourboire), collecter un avion, réapprovisionner un rayon court |
 | ~5-30 min | Vols anneaux 1-2, réappro moyen, construction d'étage, recherche |
 | ~1-6 h | Vols lointains, réappro long, fusion légendaire, gains hors ligne |
-| Jours | Montée de niveau d'aéroport, déblocage des anneaux, collection (VIP, magasins, équipage), Franchise (prestige) |
+| Jours | Cadeau quotidien, quêtes du jour, montée de niveau, déblocage des anneaux, collections (VIP, album, équipage) |
+| Semaines → mois | Pays à l'honneur, succès, Franchise (prestige infini) |
 
 ---
 
@@ -50,7 +51,7 @@ Références assumées :
 | Nom | Icône | Source | Usage |
 |---|---|---|---|
 | **Pièces** | 🪙 | Ventes des magasins, billets, pourboires, événements | Étages, améliorations, avions, recrutement standard, recherche |
-| **Miles** (monnaie premium) | ✈️ | Missions, VIP, événements rares, pubs, achats | Accélérer, recrutement premium, relancer un tirage |
+| **Miles** (monnaie premium) | ✈️ | Missions, quêtes du jour, cadeau quotidien, succès, VIP, événements rares, pubs, achats | Accélérer, recrutement premium, relancer un tirage |
 | **Ressources régionales** | 🎶 🐚 … | Vols vers le pays correspondant | Recherche du pays |
 | **Réputation (XP)** | ⭐ | Construire, voler, VIP, recherche | Niveau d'aéroport → débloque anneaux, étages, avions |
 
@@ -343,7 +344,7 @@ Découverte : le **premier vol** vers un pays ajoute son magasin commun au pool.
 Chaque avion qui ouvre un anneau est disponible **avant** l'anneau : le joueur l'achète et l'équipe en attendant le niveau.
 
 ### 10.2 Rythme mesuré (simulation)
-`npm run simulate` fait jouer un joueur scripté pendant 10 jours (sessions de 16 h par jour, gestion gloutonne : collecter, renvoyer, réapprovisionner, acheter le moins cher utile). Heures de jeu réelles pour atteindre chaque niveau :
+`npm run simulate` fait jouer un joueur scripté pendant 30 jours (Franchise dès qu'elle au moins double les étoiles, cadeaux, quêtes et succès réclamés) (sessions de 16 h par jour, gestion gloutonne : collecter, renvoyer, réapprovisionner, acheter le moins cher utile). Heures de jeu réelles pour atteindre chaque niveau :
 
 | Profil | Niv 4 (anneau 2) | Niv 8 (anneau 3) | Niv 10 | Niv 13 (anneau 4) |
 |---|---|---|---|---|
@@ -351,7 +352,7 @@ Chaque avion qui ouvre un anneau est disponible **avant** l'anneau : le joueur l
 | Occasionnel (5 min toutes les 4 h) | 32 h | 124 h (5 jours) | 196 h (8 jours) | > 10 jours |
 
 Revenus du joueur assidu : ~130 🪙/s après 6 h, ~1 700 🪙/s au jour 2, ~8 000 🪙/s au jour 7. Miles gagnés sans pub ni achat : ~160 en 10 jours (missions 46, Millionnaire, événements rares).
-Limite connue : vers le niveau 12-13, les pièces s'accumulent plus vite que les étages ne se construisent → c'est le moment d'introduire la **Franchise** (§14).
+Vers le niveau 12-13, les pièces s'accumulent plus vite que les étages ne se construisent : c'est exactement là que la **Franchise** (§14) se débloque et relance la boucle.
 
 ## 11. Missions (onboarding)
 Chaîne de missions qui guide le joueur et donne des Miles. Une seule mission active ; la récompense se réclame d'un tap, puis la suivante s'affiche.
@@ -409,8 +410,15 @@ Toutes les intégrations passent par `src/core/monetization.ts`.
 
 Plus tard : AdMob (pubs récompensées) + achats in-app via plugins Capacitor, sans toucher au gameplay.
 
-## 14. Prestige « Franchise » (post-MVP)
-Revendre l'aéroport pour en ouvrir un dans une nouvelle ville. Gain : **Étoiles d'Alliance** = `√(pièces totales / 1M)`, chacune +5 % revenus permanents. On garde : équipage légendaire, Carnet VIP, technologies cosmétiques.
+## 14. Prestige « Franchise »
+Revendre l'aéroport pour en ouvrir un dans une nouvelle ville.
+
+- Débloquée au **niveau 12**, et seulement si elle rapporte au moins 1 étoile.
+- **Étoiles d'Alliance** sur toute la carrière : `⌊√(pièces gagnées au total / 1 M)⌋`. Une Franchise donne les étoiles gagnées depuis la précédente. Il faut donc 4× plus de pièces pour doubler ses étoiles : la boucle ralentit naturellement.
+- Chaque étoile : **+5 % de revenus** des magasins et des billets, pour toujours.
+- **On garde** : étoiles, Miles (monnaie premium, jamais perdue), équipage **légendaire** (désaffecté), Carnet VIP, album, succès, statistiques de carrière, série quotidienne et quêtes du jour, couleurs, missions d'onboarding terminées.
+- **On repart de zéro** : pièces (300), niveau, étages, magasins, avions (un Coucou), équipage non légendaire, ressources, recherches, pays découverts, plans, VIP.
+- Rythme mesuré (joueur assidu) : 1re Franchise vers le jour 5 (+20 ⭐, revenus ×2), puis la partie suivante retrouve le niveau 11 en 2 jours et va plus loin (niveau 15 au jour 20, 3 Franchises en 30 jours).
 
 ## 15. Direction artistique
 - **Voxel 3D** rendu en **basse résolution** puis agrandi sans lissage → pixel art « 3D ».
@@ -433,4 +441,54 @@ Revendre l'aéroport pour en ouvrir un dans une nouvelle ville. Gain : **Étoile
 - ✅ VIP à pouvoir + VIP à demandes + Carnet
 - ✅ Missions d'onboarding
 - ✅ Hors ligne, sauvegarde, emplacements de monétisation (récompense immédiate)
-- ⏳ Post-MVP : Franchise, événements saisonniers, sons, Capacitor, vrais SDK pubs/IAP
+- ✅ Franchise (prestige)
+- ✅ Rétention : cadeau quotidien, quêtes du jour, succès, album, pays de la semaine, notifications planifiées (§18)
+- ⏳ Post-MVP : événements saisonniers à thème, classements entre amis, sons, Capacitor (notifications locales réelles), vrais SDK pubs/IAP
+
+## 18. Durée de vie et rétention
+
+### 18.1 Audit
+| Levier | Horizon | État |
+|---|---|---|
+| Gains hors ligne, stock « Gros » à lancer avant de partir | heures | ✅ |
+| Chronos courts (réappro, vols, guidage) | minutes | ✅ |
+| Destinations renouvelées toutes les 4 h, recrutement gratuit toutes les 4 h | heures | ✅ |
+| Missions d'onboarding (15) | 1-3 jours | ✅ |
+| **Cadeau quotidien** avec série de 7 jours | jours | ✅ nouveau |
+| **Quêtes du jour** (3 + coffre) | jours | ✅ nouveau |
+| **Pays à l'honneur** de la semaine | semaines | ✅ nouveau |
+| Anneaux 1 → 4, recherche (32 technos) | 1-3 semaines | ✅ |
+| Collections : Carnet VIP (16), équipage, étoiles de magasins, **album** (43 magasins) | semaines | ✅ album nouveau |
+| **Succès** à paliers (36) | semaines → mois | ✅ nouveau |
+| **Franchise** (prestige infini) | semaines → mois | ✅ nouveau |
+| **Notifications** planifiées | retour du joueur | ✅ calculées, à brancher (Capacitor) |
+| Événements saisonniers, social (amis, classements) | mois | ⏳ post-MVP |
+
+### 18.2 Cadeau quotidien
+Un cadeau par jour (jour UTC), cycle de 7 jours. Manquer un jour fait recommencer le cycle au jour 1.
+
+| Jour | 1 | 2 | 3 | 4 | 5 | 6 | 7 |
+|---|---|---|---|---|---|---|---|
+| Cadeau | 300 🪙 × niv | 3 ✈️ | 600 🪙 × niv | recrue standard | 5 ✈️ | 1 200 🪙 × niv | **recrue premium** |
+
+Équipage plein (30) → la recrue est remplacée par des Miles (5 ou 30).
+
+### 18.3 Quêtes du jour
+- 3 quêtes tirées chaque jour (graine joueur + jour), parmi 10 : collecter `10 + 2 × niv` vols, 8 réappros, 5 améliorations de magasin, 3 améliorations d'avion, guider 3 passagers, utiliser 1 VIP, satisfaire 1 VIP, gagner `2 000 × niv²` pièces, lancer 1 fusion, terminer 1 recherche. Les quêtes impossibles au niveau actuel (fusion avant le niveau 3…) ne sortent pas.
+- La progression compte à partir du tirage. Chaque quête : 3 ✈️ + `200 × niv` 🪙. Les trois réclamées : **coffre** de 5 ✈️ (14 ✈️ par jour au total).
+
+### 18.4 Succès
+36 succès en paliers, de quelques heures à plusieurs mois de jeu : étages (10 → 100), vols (100 → 50 000), pièces (1 M → 1 000 Md), VIP différents (5 → 16), album (10 → 43), pays (2 → 8), recherches (4 → 32), légendaires (1 → 9), Franchises (1 → 25), série quotidienne (7 → 100 jours). Récompense : 3 à 150 ✈️ (≈ 1 000 ✈️ au total).
+
+### 18.5 Album de magasins
+Chaque magasin ouvert au moins une fois (tirage, relance ou plan) entre dans l'album, qui survit à la Franchise. Une **série complète** donne un bonus permanent de revenus des magasins : +3 % par pays (et pour la série neutre), **+10 %** pour la série des 8 magasins de fusion.
+
+### 18.6 Pays à l'honneur
+Chaque semaine (lundi 00 h UTC), un pays est à l'honneur, le même pour tous les joueurs, à tour de rôle : vols vers lui **+50 % de billets, ×2 ressource**, et ses VIP viennent deux fois plus souvent. Ça pousse à relancer la recherche de ce pays et à varier ses vols. Plus tard : un événement et un magasin exclusifs par semaine.
+
+### 18.7 Notifications
+Au départ du joueur, le jeu calcule les rappels à programmer (`plannedNotifications`) : premier avion qui atterrit, premier rayon vide, étage terminé, recherche terminée, recrutement gratuit prêt, cadeau quotidien du lendemain (9 h). Une notification par type, branchées plus tard sur les notifications locales Capacitor.
+
+### 18.8 Miles gagnés sans payer (simulation, joueur assidu)
+~30 ✈️ par jour en régime établi (quêtes 14, cadeau ~2, succès, Millionnaire, événements rares), soit une recrue premium par jour ou de quoi accélérer les chronos clés. Les pubs (30 / jour) et les packs viennent en plus.
+

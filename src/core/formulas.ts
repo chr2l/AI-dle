@@ -131,3 +131,16 @@ export const MAX_VISITOR_CHECKS = 10;
 
 /** 1 Mile per started 10 minutes remaining. */
 export const rushCost = (remainingSec: number) => Math.max(1, Math.ceil(remainingSec / 600));
+
+// --- Long-term & retention (GDD §14, §18) -----------------------------------
+
+export const PRESTIGE_STAR_BONUS = 0.05;
+export const FRANCHISE_LEVEL = 12;
+/** Alliance stars earned over a whole career: √(total coins / 1M). */
+export const allianceStars = (totalCoins: number) => Math.floor(Math.sqrt(totalCoins / 1e6));
+export const ALBUM_SET_BONUS = 0.03;
+export const ALBUM_FUSION_BONUS = 0.1;
+export const DAY_MS = 24 * 3600 * 1000;
+export const WEEK_MS = 7 * DAY_MS;
+/** Featured country of the week: ×2 resource, +50 % tickets, VIPs twice as likely. */
+export const FEATURED = { coins: 1.5, resource: 2, vipChance: 2 } as const;

@@ -6,6 +6,9 @@ import { DECO_BY_ID, TECH_BY_ID, type DecoDef } from './data/research';
 import { RARITY_INFO, SHOPS, SHOP_BY_ID, type ShopDef } from './data/shops';
 import {
   ADJACENCY_BONUS,
+  ALBUM_FUSION_BONUS,
+  ALBUM_SET_BONUS,
+  PRESTIGE_STAR_BONUS,
   AFFINITY_BONUS,
   CABIN_COMFORT_PER_POINT,
   CARNET_BONUS,
@@ -19,7 +22,7 @@ import {
   loungeCapacity,
   vipMinComfort,
 } from './formulas';
-import type { CountryId, CrewMember, CrewRole, GameState, PlaneState, ShopCategory, StatKey, VipState } from './types';
+import type { CountryId, CrewMember, Element, CrewRole, GameState, PlaneState, ShopCategory, StatKey, VipState } from './types';
 
 // --- Research effects ----------------------------------------------------------
 
@@ -55,6 +58,32 @@ export function resourceBonus(state: GameState, countryId: CountryId): number {
     if (tech?.countryId === countryId && tech.effect.type === 'shop') bonus += tech.effect.resourcePct ?? 0;
   }
   return bonus;
+}
+
+/** Franchise: each Alliance star gives +5 % shop and ticket income. */
+export function prestigeMult(state: GameState): number {
+  return 1 + PRESTIGE_STAR_BONUS * state.prestige.stars;
+}
+
+/** Album sets: each country whose shops were all opened once, and the fusion set. */
+export function albumSets(state: GameState): { id: Element | 'fusion'; owned: number; total: number }[] {
+  const owned = new Set(state.album);
+  const sets = new Map<Element | 'fusion', { owned: number; total: number }>();
+  for (const def of SHOPS) {
+    const key = def.fusionOnly ? 'fusion' : def.elements[0];
+    const set = sets.get(key) ?? { owned: 0, total: 0 };
+    set.total++;
+    if (owned.has(def.id)) set.owned++;
+    sets.set(key, set);
+  }
+  return [...sets].map(([id, v]) => ({ id, ...v }));
+}
+
+export function albumBonus(state: GameState): number {
+  return albumSets(state).reduce(
+    (sum, s) => sum + (s.owned === s.total ? (s.id === 'fusion' ? ALBUM_FUSION_BONUS : ALBUM_SET_BONUS) : 0),
+    0,
+  );
 }
 
 export function carnetBonus(state: GameState): number {
@@ -99,7 +128,8 @@ export function shopRate(state: GameState, floorIndex: number): number {
     (1 + 0.5 * (shop.stars - 1)) *
     (1 + TRAFFIC_BONUS * (state.level - 1)) *
     (1 + ADJACENCY_BONUS * neighbors) *
-    (1 + decoBonuses(state).shopIncomePct + carnetBonus(state))
+    (1 + decoBonuses(state).shopIncomePct + carnetBonus(state) + albumBonus(state)) *
+    prestigeMult(state)
   );
 }
 
