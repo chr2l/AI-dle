@@ -1,4 +1,15 @@
-import { Color, DataTexture, MeshBasicMaterial, NearestFilter, SRGBColorSpace, OrthographicCamera, Scene, Vector3, WebGLRenderer } from 'three';
+import {
+  Color,
+  DataTexture,
+  MeshBasicMaterial,
+  NearestFilter,
+  OrthographicCamera,
+  Scene,
+  SRGBColorSpace,
+  Vector3,
+  WebGLRenderer,
+} from 'three';
+import { EDGE, EDGE_ATLAS_COLUMNS } from './voxel';
 
 /**
  * - `cube`: crisp full-resolution render, every voxel drawn as a visible cube
@@ -23,16 +34,26 @@ export const ISO_DIRECTION = new Vector3(1, 1, 1).normalize();
 export const voxelMaterial = new MeshBasicMaterial({ vertexColors: true });
 
 /**
- * Edge texture for the cube style: a darker 1-texel border and a lighter
- * inner rim on every face, multiplied with the baked vertex colors.
+ * Outline atlas for the cube style: 4×4 tiles, one per edge mask (see
+ * EDGE in voxel.ts). A tile darkens a 1-texel line only on the edges its
+ * mask names, so cubes of one object join seamlessly.
  */
-export function cubeEdgeTexture(size = 16): DataTexture {
+export function cubeEdgeTexture(tile = 16, darkness = 0.8): DataTexture {
+  const size = tile * EDGE_ATLAS_COLUMNS;
   const data = new Uint8Array(size * size * 4);
-  for (let y = 0; y < size; y++)
-    for (let x = 0; x < size; x++) {
-      const ring = Math.min(x, y, size - 1 - x, size - 1 - y);
-      const v = ring === 0 ? 168 : ring === 1 && (x === 1 || y === size - 2) ? 255 : 236;
-      data.set([v, v, v, 255], (y * size + x) * 4);
+  const line = Math.round(255 * darkness);
+  for (let ty = 0; ty < size; ty++)
+    for (let tx = 0; tx < size; tx++) {
+      const mask = Math.floor(ty / tile) * EDGE_ATLAS_COLUMNS + Math.floor(tx / tile);
+      const x = tx % tile;
+      const y = ty % tile;
+      const edged =
+        (mask & EDGE.u0 && x === 0) ||
+        (mask & EDGE.u1 && x === tile - 1) ||
+        (mask & EDGE.v0 && y === 0) ||
+        (mask & EDGE.v1 && y === tile - 1);
+      const v = edged ? line : 255;
+      data.set([v, v, v, 255], (ty * size + tx) * 4);
     }
   const texture = new DataTexture(data, size, size);
   texture.magFilter = NearestFilter;

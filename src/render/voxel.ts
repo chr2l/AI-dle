@@ -73,7 +73,7 @@ function toColor(color: number | string): number {
   return typeof color === 'number' ? color : parseInt(color.replace('#', ''), 16);
 }
 
-interface FaceDef {
+export interface FaceDef {
   dir: [number, number, number];
   shade: number;
   /** Four corners, counter-clockwise seen from outside. */
@@ -92,21 +92,71 @@ const FACES: FaceDef[] = [
 export interface MeshData {
   positions: Float32Array;
   colors: Float32Array;
-  /** Each face gets the full 0..1 square, so a texture can draw cube edges. */
+  /** Points each face at the tile of the edge atlas matching its outline mask. */
   uvs: Float32Array;
   indices: Uint32Array;
   faceCount: number;
 }
 
+/** Outline bits of a face, in its own uv frame. */
+export const EDGE = { u0: 1, u1: 2, v0: 4, v1: 8 } as const;
+/** The 16 masks are laid out as a 4×4 atlas (see cubeEdgeTexture). */
+export const EDGE_ATLAS_COLUMNS = 4;
+
+/** Above this distance (sum of RGB channel gaps, 0..765) two voxels belong to different objects. */
+const OBJECT_COLOR_GAP = 60;
+
+/** In-plane overlap of neighboring quads, in voxels. */
+const SEAM_OVERLAP = 0.02;
+
+function sameObject(a: number, b: number): boolean {
+  const gap =
+    Math.abs(((a >> 16) & 255) - ((b >> 16) & 255)) +
+    Math.abs(((a >> 8) & 255) - ((b >> 8) & 255)) +
+    Math.abs((a & 255) - (b & 255));
+  return gap <= OBJECT_COLOR_GAP;
+}
+
+/**
+ * Which edges of a visible face get an outline: only where the surface of an
+ * object ends (silhouette, corner) or meets a different object (color
+ * change). Faces inside one object join without a line.
+ */
+export function faceEdgeMask(grid: VoxelGrid, x: number, y: number, z: number, face: FaceDef): number {
+  const color = grid.get(x, y, z);
+  const [c0, c1, , c3] = face.corners;
+  const u = [c1[0] - c0[0], c1[1] - c0[1], c1[2] - c0[2]];
+  const v = [c3[0] - c0[0], c3[1] - c0[1], c3[2] - c0[2]];
+  const n = face.dir;
+  const edges: [number[], number][] = [
+    [u.map((a) => -a), EDGE.u0],
+    [u, EDGE.u1],
+    [v.map((a) => -a), EDGE.v0],
+    [v, EDGE.v1],
+  ];
+  let mask = 0;
+  for (const [[dx, dy, dz], bit] of edges) {
+    const side = grid.get(x + dx, y + dy, z + dz);
+    const over = grid.get(x + dx + n[0], y + dy + n[1], z + dz + n[2]);
+    // Concave crease: the face meets the side of the voxel standing next to it.
+    if (over >= 0) {
+      if (!sameObject(color, over)) mask |= bit;
+    } else if (side < 0 || !sameObject(color, side)) mask |= bit;
+  }
+  return mask;
+}
+
 /**
  * Builds the visible faces of a grid (faces touching another voxel are
- * culled) with the face shading baked into vertex colors.
+ * culled) with the face shading baked into vertex colors and an outline
+ * mask per face for the cube style.
  */
 export function buildMeshData(grid: VoxelGrid): MeshData {
   const positions: number[] = [];
   const colors: number[] = [];
   const uvs: number[] = [];
   const indices: number[] = [];
+  const inset = 0.002;
   let faceCount = 0;
   for (let y = 0; y < grid.height; y++)
     for (let z = 0; z < grid.depth; z++)
@@ -118,10 +168,17 @@ export function buildMeshData(grid: VoxelGrid): MeshData {
           if (grid.get(x + face.dir[0], y + face.dir[1], z + face.dir[2]) >= 0) continue;
           const base = positions.length / 3;
           for (const [cx, cy, cz] of face.corners) {
-            positions.push(x + cx, y + cy, z + cz);
+            // Grow each quad a hair inside its plane so no seam shows between faces.
+            const grow = (c: number, axis: number) => (face.dir[axis] === 0 ? (c - 0.5) * SEAM_OVERLAP : 0);
+            positions.push(x + cx + grow(cx, 0), y + cy + grow(cy, 1), z + cz + grow(cz, 2));
             colors.push(r * face.shade, g * face.shade, b * face.shade);
           }
-          uvs.push(0, 0, 1, 0, 1, 1, 0, 1);
+          const mask = faceEdgeMask(grid, x, y, z, face);
+          const col = mask % EDGE_ATLAS_COLUMNS;
+          const row = Math.floor(mask / EDGE_ATLAS_COLUMNS);
+          const lo = (t: number) => (t + inset) / EDGE_ATLAS_COLUMNS;
+          const hi = (t: number) => (t + 1 - inset) / EDGE_ATLAS_COLUMNS;
+          uvs.push(lo(col), lo(row), hi(col), lo(row), hi(col), hi(row), lo(col), hi(row));
           indices.push(base, base + 1, base + 2, base, base + 2, base + 3);
           faceCount++;
         }

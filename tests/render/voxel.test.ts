@@ -7,7 +7,9 @@ import { buildFloorModel, FLOOR } from '../../src/render/models/floor';
 import { buildPlaneModel } from '../../src/render/models/plane';
 import { mix, paletteFor } from '../../src/render/palette';
 import { cubeEdgeTexture, ISO_DIRECTION, snapToPixelGrid } from '../../src/render/pixelRenderer';
-import { buildMeshData, FACE_SHADE, VoxelGrid } from '../../src/render/voxel';
+import { buildMeshData, EDGE, EDGE_ATLAS_COLUMNS, FACE_SHADE, faceEdgeMask, VoxelGrid } from '../../src/render/voxel';
+
+const FACES_TOP = { dir: [0, 1, 0] as [number, number, number], shade: 1, corners: [[0, 1, 1], [1, 1, 1], [1, 1, 0], [0, 1, 0]] as [number, number, number][] };
 
 describe('VoxelGrid + mesh', () => {
   it('culls faces shared by two voxels', () => {
@@ -26,12 +28,23 @@ describe('VoxelGrid + mesh', () => {
     for (const s of [FACE_SHADE.top, FACE_SHADE.left, FACE_SHADE.right]) expect(shades).toContain(s);
   });
 
-  it('maps the full texture square on every face for the cube edges', () => {
-    const data = buildMeshData(new VoxelGrid(1, 1, 1).set(0, 0, 0, 0xffffff));
-    expect(data.uvs.length).toBe((data.positions.length / 3) * 2);
+  it('outlines objects but not the cubes inside one object', () => {
+    const top = FACES_TOP;
+    const g = new VoxelGrid(3, 1, 1).box(0, 0, 0, 1, 0, 0, 0xc86bfa);
+    // Two cubes of one object: no line where they meet, lines on the outside.
+    expect(faceEdgeMask(g, 0, 0, 0, top) & EDGE.u1).toBe(0);
+    expect(faceEdgeMask(g, 0, 0, 0, top) & EDGE.u0).toBe(EDGE.u0);
+    // A different object next to it gets a line.
+    g.set(2, 0, 0, 0x2ec4a6);
+    expect(faceEdgeMask(g, 1, 0, 0, top) & EDGE.u1).toBe(EDGE.u1);
+  });
+
+  it('builds a 4x4 outline atlas with lines only on masked edges', () => {
     const tex = cubeEdgeTexture(8);
-    const px = (x: number, y: number) => (tex.image.data as Uint8Array)[(y * 8 + x) * 4];
-    expect(px(0, 4)).toBeLessThan(px(4, 4));
+    const size = 8 * EDGE_ATLAS_COLUMNS;
+    const px = (x: number, y: number) => (tex.image.data as Uint8Array)[(y * size + x) * 4];
+    expect(px(0, 4)).toBe(255); // mask 0: no line
+    expect(px(3 * 8, 3 * 8 + 4)).toBeLessThan(255); // mask 15: all lines
   });
 
   it('ignores writes outside the grid', () => {
