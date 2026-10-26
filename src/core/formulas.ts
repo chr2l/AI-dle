@@ -89,3 +89,31 @@ export const researchCost = (ring: number, k: number) => ({
 });
 export const researchDuration = (ring: number, k: number) => 60 * 2.5 ** k * ring;
 export const RESEARCH_XP = 30;
+
+// --- Fusion (GDD §4.6) -------------------------------------------------------
+
+export const fusionCost = (rankA: number, rankB: number) => 300 * (rankA + rankB);
+export const fusionDuration = (rankA: number, rankB: number) => 120 * (rankA + rankB);
+
+// --- Visitors: VIPs and guided passengers (GDD §4.7, §5) ---------------------
+
+export const VIP_CHECK_SECONDS = 60;
+/** Per neutral shop, per check. */
+export const POWER_VIP_CHANCE = 0.02;
+/** Per country shop, per check. */
+export const COUNTRY_VIP_CHANCE = 0.03;
+export const MAX_VIPS_WAITING = 4;
+export const POWER_VIP_STAY_SECONDS = 10 * 60;
+export const COUNTRY_VIP_STAY_SECONDS = 30 * 60;
+export const vipMinComfort = (ring: number) => 2 + 2 * ring;
+export const ARRIVALS_X2_SECONDS = 10 * 60;
+export const MILLIONAIRE_MILES = 5;
+
+export const GUIDE_CHECK_SECONDS = 30;
+export const GUIDE_CHANCE = 0.25;
+export const GUIDE_STAY_SECONDS = 60;
+export const guideTip = (floor: number) => 5 * floor;
+export const GUIDE_MILE_CHANCE = 0.05;
+
+/** Offline catch-up is capped so a long absence does not flood the hall. */
+export const MAX_VISITOR_CHECKS = 10;

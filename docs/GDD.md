@@ -117,12 +117,16 @@ revenu/s = base(rareté) × 1.25^(niveau-1) × (1 + 0.5 × (étoiles-1))
 - Débloquée au niveau 3. Choisir 2 magasins (ils ne sont pas consommés).
 - Résultat possible : tout magasin dont les éléments ⊆ éléments(A) ∪ éléments(B), pondéré par rareté ; les magasins **à double élément** ne s'obtiennent **que** par fusion.
 - Coût : `300 × (rang A + rang B)` pièces (rang C=1…L=4). Durée : `2 min × (rang A + rang B)`.
-- Le résultat devient un **plan** (inventaire) → à poser sur un étage vide, ou à utiliser comme doublon (+1 étoile).
+- Le résultat devient un **plan** (inventaire) → à poser sur un étage vide, ou à utiliser comme doublon (+1 étoile, sur un étage portant le même magasin).
+- Le résultat est tiré parmi **tous** les magasins compatibles, y compris ceux pas encore dans le pool du tirage : la fusion est un raccourci vers les magasins rares et épiques des pays. Exemple : Disquaire 🎵 + Bar à smoothies 🌴 → magasins neutres, de Mélodia, de Tropicalia, ou Beach party.
+- Une seule fusion à la fois. La recette est fixée (et payée) au lancement ; le plan arrive à la fin du chrono.
 
 ### 4.7 Passagers
 - Arrivées : `0.3 + 0.05 × magasins` passagers/s, vers la salle d'embarquement (cap `20 + 10 × niv. salle` + bonus déco, niveau de salle 1 au départ).
 - 🤳 Influenceuse : les arrivées comptent double pendant 10 min.
-- **Guider** (actif) : un passager apparaît parfois dans le hall avec une bulle « étage X » → tap → pourboire (`5 × étage`) et petite chance de 1 ✈️.
+- **Guider** (actif) : un passager apparaît parfois dans le hall avec une bulle « étage X » → tap → pourboire (`5 × étage`) et 5 % de chance de 1 ✈️.
+  - Un test toutes les 30 s : 25 % de chance qu'un passager apparaisse (s'il n'y en a pas déjà un), vers un étage qui a un magasin. Il attend 1 min.
+  - Se tromper d'étage le fait repartir sans pourboire.
 
 ### 4.8 Personnalisation
 - Couleur de mur par étage, couleur de façade, sol du hall.
@@ -151,6 +155,16 @@ Attirés par les magasins d'un pays. Ils attendent **30 min** en salle d'embarqu
 - module requis : le module du pays **s'il est recherché** (ex : le Rockeur veut un 🪩 Dancefloor).
 
 Satisfait → `500 × 3^(anneau-1)` 🪙, `20 × anneau` ressource, 3 ✈️, 40 ⭐, et une entrée au **Carnet** (+1 % pièces par VIP unique servi).
+
+Non satisfait (mauvais pays, confort trop bas, module manquant) → rien, et le VIP repart. Dans les deux cas il quitte la salle.
+
+### 5.3 Apparition
+- Un test par minute (hors ligne : 10 tests au plus au retour) :
+  - VIP à pouvoir : `2 % × magasins neutres` ;
+  - pour chaque pays dont l'anneau est débloqué : `3 % × magasins de ce pays` (un magasin à double élément compte pour ses deux pays).
+- Chances ×(1 + 30 %) avec la déco 🔥 Brasero éternel.
+- **4 VIP au plus** attendent en même temps. Un VIP embarqué dans un vol ne repart pas à l'expiration.
+- Effets précis : 📦 Livreur = réappro « Petit » instantané de tous les rayons vides ; 🎤 Influenceuse cumulable (+10 min) ; 🎧 Contrôleur = −50 % du temps restant de chaque vol, sans consommer le « Vent arrière » ; un VIP sans effet possible (aucun chantier, aucun rayon vide, aucun vol) reste dans le hall.
 
 ---
 
@@ -309,7 +323,27 @@ Découverte : le **premier vol** vers un pays ajoute son magasin commun au pool.
 - Débloque : anneaux (1/4/8/13), étages (+2/niv), avions, hangar (+1 / 3 niv), fusion (niv 3).
 
 ## 11. Missions (onboarding)
-Chaîne de missions qui guide le joueur et donne des Miles : construire un étage → ouvrir un magasin → réapprovisionner → envoyer un vol → collecter → recruter → assigner l'équipage → améliorer un avion → rechercher → niveau 4 → visiter l'anneau 2 → fusionner → servir un VIP…
+Chaîne de missions qui guide le joueur et donne des Miles. Une seule mission active ; la récompense se réclame d'un tap, puis la suivante s'affiche.
+
+| # | Mission | Récompense |
+|---|---|---|
+| 1 | Construire un étage | 2 ✈️ + 100 🪙 |
+| 2 | Ouvrir un magasin | 2 ✈️ |
+| 3 | Réapprovisionner un rayon | 2 ✈️ |
+| 4 | Envoyer un vol | 2 ✈️ |
+| 5 | Collecter un avion | 3 ✈️ |
+| 6 | Avoir 3 étages | 3 ✈️ |
+| 7 | Recruter un équipier | 3 ✈️ + 500 🪙 |
+| 8 | Assigner un équipier | 3 ✈️ |
+| 9 | Améliorer un avion | 3 ✈️ |
+| 10 | Améliorer un magasin | 3 ✈️ |
+| 11 | Terminer une recherche | 5 ✈️ |
+| 12 | Atteindre le niveau 4 | 5 ✈️ |
+| 13 | Visiter un pays de l'anneau 2 | 5 ✈️ |
+| 14 | Fusionner deux magasins | 5 ✈️ |
+| 15 | Satisfaire un VIP | 10 ✈️ |
+
+Total : 56 ✈️, soit presque deux recrutements premium.
 
 ## 12. Hors ligne
 Tout est basé sur des **horodatages** : ventes (jusqu'à épuisement du stock), vols, recherche, constructions, fusion. Arrivées de passagers plafonnées à la salle. Au retour : récapitulatif (durée, pièces vendues, avions rentrés) + 📺 « ×2 gains hors ligne » (une fois par retour, sur les ventes des magasins).
@@ -343,7 +377,7 @@ Revendre l'aéroport pour en ouvrir un dans une nouvelle ville. Gain : **Étoile
 
 ## 16. Technique
 - TypeScript + Vite + Three.js. Logique de jeu pure et testée (`src/core`), rendu (`src/render`), interface (`src/ui`).
-- Sauvegarde locale (`localStorage`), versionnée.
+- Sauvegarde locale (`localStorage`, clé `idleport.save`) toutes les 10 s et à la fermeture, versionnée : chaque nouvelle version ajoute une migration, et les champs absents d'une ancienne sauvegarde sont remplis avec les valeurs de départ. Une sauvegarde illisible ou plus récente que le jeu est ignorée.
 - Packaging mobile prévu via Capacitor (Android / iOS).
 
 ## 17. Périmètre MVP (v0.1)

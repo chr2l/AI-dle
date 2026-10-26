@@ -177,6 +177,11 @@ export function tick(state: GameState, now: number): TickResult {
     state.stats.researchDone++;
     addXp(state, RESEARCH_XP);
   }
+  if (state.fusion && state.fusion.endsAt <= now) {
+    state.plans.push(state.fusion.resultId);
+    delete state.fusion;
+    state.stats.fusions++;
+  }
 
   // VIPs leave when they are tired of waiting (unless already on board).
   const boarded = new Set(state.planes.flatMap((p) => p.flight?.vipUids ?? []));
