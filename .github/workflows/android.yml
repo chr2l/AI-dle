@@ -1,0 +1,58 @@
+name: APK Android
+# Construit un APK de debug à chaque push sur main (ou à la demande) et le
+# publie dans la release « apk-test » : lien fixe, toujours la dernière version.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: android-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - run: npm ci
+      - run: npm test
+      - run: npm run build
+      # Le projet natif est généré à la volée tant qu'il n'est pas versionné.
+      - name: Projet Android (Capacitor)
+        run: |
+          [ -d android ] || npx cap add android
+          npx cap sync android
+      - name: Gradle assembleDebug
+        working-directory: android
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleDebug --no-daemon
+      - name: Renommer l'APK
+        run: cp android/app/build/outputs/apk/debug/app-debug.apk IdlePort-debug.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: IdlePort-debug-apk
+          path: IdlePort-debug.apk
+      - name: Publier dans la release apk-test
+        if: github.event_name != 'pull_request'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release delete apk-test --yes --cleanup-tag || true
+          gh release create apk-test IdlePort-debug.apk \
+            --target "$GITHUB_SHA" --prerelease \
+            --title "APK de test ($(date -u +'%d/%m %H:%M') UTC)" \
+            --notes "APK de debug construit depuis ${GITHUB_SHA::7}. Sur Android : télécharger, ouvrir, autoriser l'installation depuis cette source."
