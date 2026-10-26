@@ -6,7 +6,8 @@ import { fusionResults, placePlan, planAsStar, startFusion } from '../src/core/f
 import { claimMission, currentMission, update } from '../src/core/game';
 import { deserialize, load, save, serialize } from '../src/core/save';
 import { createInitialState } from '../src/core/state';
-import { countryVipDemand, guidePassenger, spawnVisitors, useVip } from '../src/core/visitors';
+import { countryVipDemand } from '../src/core/stats';
+import { guidePassenger, spawnVisitors, useVip } from '../src/core/visitors';
 import type { GameState } from '../src/core/types';
 
 const T0 = 1_800_000_000_000;
@@ -141,5 +142,61 @@ describe('save', () => {
     expect(load(T0, storage)).toBeNull();
     save(state, storage);
     expect(load(T0, storage)?.seed).toBe(42);
+  });
+});
+
+describe('rush, lounge, crew, cosmetics, ads', () => {
+  it('finishes timers for 1 Mile per started 10 min', async () => {
+    const { rush, rushPrice } = await import('../src/core/game');
+    const { buildFloor } = await import('../src/core/engine');
+    state.coins = 1e6;
+    for (let i = 0; i < 9; i++) state.floors.push({});
+    state.level = 3;
+    buildFloor(state, T0); // floor 10: 15 × 10^1.3 ≈ 299 s
+    expect(rushPrice(state, { kind: 'build' }, T0)).toBe(1);
+    expect(rush(state, { kind: 'build' }, T0).ok).toBe(true);
+    expect(state.miles).toBe(9);
+    expect(state.floors[9].buildEndsAt).toBeUndefined();
+    expect(rush(state, { kind: 'research' }, T0).ok).toBe(false);
+  });
+
+  it('upgrades the lounge', async () => {
+    const { upgradeLounge } = await import('../src/core/engine');
+    state.coins = 400;
+    expect(upgradeLounge(state).ok).toBe(true);
+    expect(state.lounge.level).toBe(2);
+    expect(upgradeLounge(state).ok).toBe(false);
+  });
+
+  it('caps and dismisses crew', async () => {
+    const { dismissCrew, recruit, assignCrew } = await import('../src/core/engine');
+    state.coins = 1e9;
+    for (let i = 0; i < 30; i++) recruit(state, 'coins', T0);
+    expect(recruit(state, 'coins', T0).ok).toBe(false);
+    const c = state.crew[0];
+    assignCrew(state, c.uid, state.planes[0].uid);
+    expect(dismissCrew(state, c.uid).ok).toBe(true);
+    expect(state.crew).toHaveLength(29);
+    expect(state.planes[0].crew[c.role]).toBeUndefined();
+  });
+
+  it('paints floors with palette colors only', async () => {
+    const { setColor } = await import('../src/core/engine');
+    state.floors.push({});
+    expect(setColor(state, 0, '#f7d6e0').ok).toBe(true);
+    expect(setColor(state, 0, '#123456').ok).toBe(false);
+    expect(setColor(state, 'facade', '#123456').ok).toBe(true);
+  });
+
+  it('limits ads per slot and per day', async () => {
+    const { adAvailable, recordAd, adsLeftToday } = await import('../src/core/monetization');
+    expect(adAvailable(state, 'restock_express', T0)).toBe(true);
+    recordAd(state, 'restock_express', T0);
+    expect(adAvailable(state, 'restock_express', T0 + 60 * S)).toBe(false);
+    expect(adAvailable(state, 'restock_express', T0 + 5 * 60 * S)).toBe(true);
+    for (let i = 0; i < 29; i++) recordAd(state, 'tailwind', T0);
+    expect(adsLeftToday(state, T0)).toBe(0);
+    expect(adAvailable(state, 'tailwind', T0)).toBe(false);
+    expect(adsLeftToday(state, T0 + 24 * 3600 * S)).toBe(30);
   });
 });

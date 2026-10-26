@@ -1,6 +1,5 @@
 // Hall visitors: VIPs (GDD §5) and passengers to guide (GDD §4.7).
 import { COUNTRY_BY_ID } from './data/countries';
-import { MODULES } from './data/planes';
 import { SHOP_BY_ID } from './data/shops';
 import { POWER_VIPS, VIPS, VIP_BY_ID } from './data/vips';
 import { type Result, finishBuild, restockExpress, speedUpFlight, unlockedRing } from './engine';
@@ -13,17 +12,17 @@ import {
   GUIDE_MILE_CHANCE,
   GUIDE_STAY_SECONDS,
   MAX_VIPS_WAITING,
+  MAX_VIP_CHANCE,
   MAX_VISITOR_CHECKS,
   MILLIONAIRE_MILES,
   POWER_VIP_CHANCE,
   POWER_VIP_STAY_SECONDS,
   VIP_CHECK_SECONDS,
   guideTip,
-  vipMinComfort,
 } from './formulas';
 import { type Rng, pick, uid } from './rng';
-import { decoBonuses, researchedModules } from './stats';
-import type { CountryId, GameState, VipState } from './types';
+import { countryVipDemand, decoBonuses } from './stats';
+import type { CountryId, GameState } from './types';
 
 const fail = (error: string): Result<never> => ({ ok: false, error });
 const done: Result = { ok: true, value: undefined };
@@ -35,20 +34,13 @@ function dueChecks(last: number, now: number, periodSec: number): [number, numbe
   return [Math.min(due, MAX_VISITOR_CHECKS), last + due * periodSec * 1000];
 }
 
-export function countryVipDemand(state: GameState, countryId: CountryId): VipState['demand'] {
-  const ring = COUNTRY_BY_ID[countryId].ring;
-  const module = MODULES.find((m) => m.countryId === countryId);
-  const researched = module && researchedModules(state).has(module.id);
-  return { countryId, minComfort: vipMinComfort(ring), moduleId: researched ? module.id : undefined };
-}
-
 function spawnVips(state: GameState, now: number, rng: Rng) {
   const chanceMult = 1 + decoBonuses(state).vipChancePct;
   const shops = state.floors.map((f) => f.shop && SHOP_BY_ID[f.shop.defId]).filter((d) => !!d);
   const waiting = () => state.vips.filter((v) => v.expiresAt > now).length;
 
   const neutral = shops.filter((d) => d.elements.includes('neutre')).length;
-  if (waiting() < MAX_VIPS_WAITING && rng() < neutral * POWER_VIP_CHANCE * chanceMult) {
+  if (waiting() < MAX_VIPS_WAITING && rng() < Math.min(MAX_VIP_CHANCE, neutral * POWER_VIP_CHANCE) * chanceMult) {
     const def = pick(rng, POWER_VIPS);
     state.vips.push({ uid: uid('vip', rng), defId: def.id, expiresAt: now + POWER_VIP_STAY_SECONDS * 1000 });
   }
@@ -61,7 +53,7 @@ function spawnVips(state: GameState, now: number, rng: Rng) {
     }
   }
   for (const [countryId, count] of byCountry) {
-    if (waiting() >= MAX_VIPS_WAITING || rng() >= count * COUNTRY_VIP_CHANCE * chanceMult) continue;
+    if (waiting() >= MAX_VIPS_WAITING || rng() >= Math.min(MAX_VIP_CHANCE, count * COUNTRY_VIP_CHANCE) * chanceMult) continue;
     const defs = VIPS.filter((v) => v.countryId === countryId);
     state.vips.push({
       uid: uid('vip', rng),

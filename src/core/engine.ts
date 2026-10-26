@@ -6,11 +6,18 @@ import { CREW_RARITY, FIRST_NAMES, LAST_NAMES, PREMIUM_RECRUIT_MILES, RECRUIT_OD
 import { EVENTS, EVENT_BY_ID, type EventDef } from './data/events';
 import { MAX_STAT_LEVEL, MODULE_BY_ID, PLANE_BY_ID, PLANE_COLORS } from './data/planes';
 import { TECHS, TECH_BY_ID } from './data/research';
-import { RARITY_INFO, RESTOCK_TIERS, SHOP_BY_ID } from './data/shops';
+import { RARITY_INFO, RESTOCK_TIERS, SHOP_BY_ID, WALL_COLORS } from './data/shops';
+import { VIPS } from './data/vips';
 import {
   AFFINITY_BONUS,
+  COUNTRY_VIP_STAY_SECONDS,
+  DESTINATION_WINDOW_MS,
+  MAX_CREW,
+  spendXp,
+  MAX_LOUNGE_LEVEL,
+  loungeUpgradeCost,
   AVOID_PER_RELIABILITY,
-  EVENT_CHANCE,
+  eventChance,
   FREE_RECRUIT_COOLDOWN_MS,
   MAX_SHOP_LEVEL,
   MAX_STARS,
@@ -40,12 +47,13 @@ import {
   vipResource,
   xpToNext,
 } from './formulas';
-import { type Rng, pick, pickWeighted, uid } from './rng';
+import { type Rng, hashString, pick, pickWeighted, uid } from './rng';
 import { newPlane } from './state';
 import {
   affinityCount,
   arrivalRate,
   carnetBonus,
+  countryVipDemand,
   crewOf,
   crewXpBonus,
   eventBonus,
@@ -133,7 +141,7 @@ export function tick(state: GameState, now: number): TickResult {
     if (floor.buildEndsAt !== undefined && floor.buildEndsAt <= now) {
       delete floor.buildEndsAt;
       state.stats.floorsBuilt++;
-      addXp(state, 10 * (i + 1));
+      addXp(state, Math.max(10 * (i + 1), spendXp(buildCost(i + 1))));
     }
   });
 
@@ -303,6 +311,7 @@ export function upgradeShop(state: GameState, floorIndex: number): Result {
   state.coins -= cost;
   shop.level++;
   state.stats.shopUpgrades++;
+  addXp(state, spendXp(cost));
   return done;
 }
 
@@ -312,6 +321,27 @@ export function addStar(state: GameState, floorIndex: number): Result {
   if (!shop) return fail('Aucun magasin sur cet étage.');
   if (shop.stars >= MAX_STARS) return fail('Étoiles au maximum.');
   shop.stars++;
+  return done;
+}
+
+export function upgradeLounge(state: GameState): Result {
+  if (state.lounge.level >= MAX_LOUNGE_LEVEL) return fail('Salle au niveau maximum.');
+  const cost = loungeUpgradeCost(state.lounge.level);
+  if (state.coins < cost) return fail('Pas assez de pièces.');
+  state.coins -= cost;
+  state.lounge.level++;
+  return done;
+}
+
+const isColor = (c: string) => /^#[0-9a-f]{6}$/i.test(c);
+
+/** Free cosmetics (GDD §4.8). `target` is a floor index, 'facade' or 'lobby'. */
+export function setColor(state: GameState, target: number | 'facade' | 'lobby', color: string): Result {
+  if (!isColor(color)) return fail('Couleur invalide.');
+  if (target === 'facade') state.facadeColor = color;
+  else if (target === 'lobby') state.lobbyColor = color;
+  else if (isBuilt(state, target) && WALL_COLORS.includes(color)) state.floors[target].wallColor = color;
+  else return fail('Couleur ou étage invalide.');
   return done;
 }
 
@@ -345,6 +375,7 @@ export function buyPlane(state: GameState, modelId: string, rng: Rng = Math.rand
   const plane = newPlane(uid('plane', rng), modelId, `${model.name} ${count}`, pick(rng, PLANE_COLORS));
   state.planes.push(plane);
   state.stats.planesBought++;
+  addXp(state, spendXp(model.price));
   return ok(plane);
 }
 
@@ -358,6 +389,7 @@ export function upgradePlane(state: GameState, planeUid: string, stat: StatKey):
   state.coins -= cost;
   plane.upgrades[stat]++;
   state.stats.planeUpgrades++;
+  addXp(state, spendXp(cost));
   return done;
 }
 
@@ -422,6 +454,7 @@ export function rollCrewMember(rng: Rng, kind: 'standard' | 'premium'): CrewMemb
 
 /** Recruits at the agency (GDD §7): coins, Miles (premium) or a free ad every 4 h. */
 export function recruit(state: GameState, payment: Payment, now: number, rng: Rng = Math.random): Result<CrewMember> {
+  if (state.crew.length >= MAX_CREW) return fail('Équipage complet : renvoyez quelqu’un d’abord.');
   if (payment === 'coins') {
     const cost = recruitCost(state.level);
     if (state.coins < cost) return fail('Pas assez de pièces.');
@@ -469,6 +502,18 @@ export function unassignCrew(state: GameState, crewUid: string): Result {
   if (plane && !isIdle(plane)) return fail("L'avion est en vol.");
   if (plane) delete plane.crew[member.role];
   delete member.planeUid;
+  return done;
+}
+
+/** Lets a crew member go (free, nothing refunded). */
+export function dismissCrew(state: GameState, crewUid: string): Result {
+  const member = state.crew.find((c) => c.uid === crewUid);
+  if (!member) return fail('Équipier introuvable.');
+  if (member.planeUid) {
+    const res = unassignCrew(state, crewUid);
+    if (!res.ok) return res;
+  }
+  state.crew = state.crew.filter((c) => c !== member);
   return done;
 }
 
@@ -535,9 +580,8 @@ export function speedUpFlight(state: GameState, planeUid: string, now: number, o
   return done;
 }
 
-function rollEvent(dest: Destination, rng: Rng): EventDef | undefined {
-  const mystery = dest.modifier === 'mystere';
-  if (!mystery && rng() >= EVENT_CHANCE) return undefined;
+function rollEvent(dest: Destination, durationSec: number, mystery: boolean, rng: Rng): EventDef | undefined {
+  if (!mystery && rng() >= eventChance(durationSec)) return undefined;
   const pool = EVENTS.filter(
     (e) => (e.country === 'any' || e.country === dest.countryId) && !!e.rare === mystery,
   );
@@ -572,6 +616,15 @@ function settle(state: GameState, report: FlightReport) {
     if (outcome?.damage) plane.damaged = true;
   }
   if (outcome?.unlockShop && !state.bonusShops.includes(outcome.unlockShop)) state.bonusShops.push(outcome.unlockShop);
+  if (outcome?.vip) {
+    const defs = VIPS.filter((v) => v.countryId === report.countryId);
+    state.vips.push({
+      uid: `vip_${report.id}`,
+      defId: defs[Math.floor(Math.abs(hashString(report.id)) % defs.length)].id,
+      expiresAt: state.lastTick + COUNTRY_VIP_STAY_SECONDS * 1000,
+      demand: countryVipDemand(state, report.countryId),
+    });
+  }
   report.pending = false;
 }
 
@@ -635,7 +688,14 @@ export function collectFlight(state: GameState, planeUid: string, now: number, r
   if (!state.discovered.includes(dest.countryId)) state.discovered.push(dest.countryId);
 
   // Random event (GDD §8.4).
-  const event = rollEvent(dest, rng);
+  // A Mystère destination guarantees its rare event once, not on every trip.
+  for (const key of Object.keys(state.cooldowns)) {
+    if (key.startsWith('mystery:') && state.cooldowns[key] < now) delete state.cooldowns[key];
+  }
+  const mysteryKey = `mystery:${dest.id}`;
+  const mystery = dest.modifier === 'mystere' && state.cooldowns[mysteryKey] === undefined;
+  if (mystery) state.cooldowns[mysteryKey] = now + DESTINATION_WINDOW_MS;
+  const event = rollEvent(dest, flightDuration(dest.distance, stats.speed), mystery, rng);
   if (event) {
     report.event = { defId: event.id };
     if (event.kind === 'choice') report.pending = true;
