@@ -43,3 +43,7 @@ button.hl { background: #e0a800; color: #1b1f3b; border-bottom-color: #8f6b00; }
 #modal .card { width: 100%; max-height: 85%; overflow-y: auto; background: var(--bg); border-top: 3px solid var(--accent); border-radius: 14px 14px 0 0; padding: 16px 14px calc(16px + env(safe-area-inset-bottom)); }
 #modal .card > button { width: 100%; margin-top: 8px; }
 #toast { position: fixed; left: 50%; bottom: 80px; transform: translateX(-50%); background: #000c; padding: 8px 14px; border-radius: 20px; font-size: 14px; z-index: 20; max-width: 90%; text-align: center; }
+#tower { height: 36vh; flex: none; border-bottom: 2px solid var(--line); touch-action: none; }
+#tower[hidden] { display: none; }
+#tower canvas { display: block; }
+#tabs button { font-size: 12px; }

@@ -1,5 +1,4 @@
-// Entry point: idle loop + the minimal DOM interface (src/ui) until the
-// three.js tower is wired to the game state.
+// Entry point: idle loop + the test interface (src/ui).
 import { createInitialState, load, update } from './core';
 import { App } from './ui/app';
 

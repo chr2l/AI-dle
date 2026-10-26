@@ -6,4 +6,4 @@
 - En local : `npm run build && npx cap add android && npx cap sync android`, puis ouvrir `android/` dans Android Studio (JDK 21, SDK Android).
 - Le jour où il faut du code natif (notifications locales, pubs), versionner `android/` : le workflow saute alors `cap add`.
 
-L'interface actuelle (`src/ui/`) est une UI DOM minimale qui expose toutes les actions du moteur, en attendant le branchement du rendu three.js.
+L'interface de test (`src/ui/`) : vue cube art de la tour (`towerView.ts`, rendu `src/render`) au-dessus de panneaux DOM qui exposent toutes les actions du moteur (tour, vols, équipe, amis, objectifs et événement saisonnier). Le social tourne sur `MemorySocialBackend` tant qu'aucun serveur n'existe : ajouter un ami par code échoue pour l'instant.

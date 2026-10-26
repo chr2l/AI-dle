@@ -1,6 +1,6 @@
-// Minimal playable DOM interface, used until the three.js tower is wired to
-// the game state. Every button maps to one engine call; the panel is redrawn
-// once per second and after each action.
+// Minimal playable DOM interface around the cube art tower view (towerView.ts).
+// Every button maps to one engine call; the panel is redrawn once per second
+// and after each action.
 import * as G from '../core';
 import { COUNTRIES, COUNTRY_BY_ID, RING_LEVELS } from '../core/data/countries';
 import { ROLE_INFO } from '../core/data/crew';
@@ -9,12 +9,14 @@ import { MAX_STAT_LEVEL, PLANE_BY_ID, PLANE_MODELS, STAT_INFO, STAT_KEYS } from 
 import { TECHS } from '../core/data/research';
 import { CATEGORIES, CATEGORY_IDS, RARITY_INFO, RESTOCK_TIERS, SHOP_BY_ID } from '../core/data/shops';
 import { VIP_BY_ID } from '../core/data/vips';
+import type { SeasonReward } from '../core/data/seasons';
 import type { GameState, PlaneState } from '../core';
 import './style.css';
+import { TowerView } from './towerView';
 
-type Tab = 'tour' | 'vols' | 'equipe' | 'objectifs';
+type Tab = 'tour' | 'vols' | 'equipe' | 'amis' | 'objectifs';
 
-const TABS: Record<Tab, string> = { tour: '🏢 Tour', vols: '✈️ Vols', equipe: '👥 Équipe', objectifs: '🎯 Objectifs' };
+const TABS: Record<Tab, string> = { tour: '🏢 Tour', vols: '✈️ Vols', equipe: '👥 Équipe', amis: '👋 Amis', objectifs: '🎯 Objectifs' };
 
 const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
 
@@ -45,9 +47,12 @@ export class App {
   private tab: Tab = 'tour';
   private modal: (() => string) | null = null;
   private toastTimer = 0;
+  private tower?: TowerView;
+  /** Local stand-in until a social server exists: friend codes cannot be found yet. */
+  private social: G.SocialBackend = new G.MemorySocialBackend();
 
   constructor(private state: GameState, private root: HTMLElement) {
-    root.innerHTML = `<header id="hud"></header><main id="panel"></main><nav id="tabs"></nav><div id="modal" hidden></div><div id="toast" hidden></div>`;
+    root.innerHTML = `<header id="hud"></header><div id="tower"><canvas></canvas></div><main id="panel"></main><nav id="tabs"></nav><div id="modal" hidden></div><div id="toast" hidden></div>`;
     root.addEventListener('click', (e) => {
       const el = (e.target as HTMLElement).closest<HTMLElement>('[data-act]');
       if (!el || (el as HTMLButtonElement).disabled) return;
@@ -57,6 +62,13 @@ export class App {
 
   /** Idle loop: simulation every frame, panel redraw every second, autosave. */
   start() {
+    try {
+      this.tower = new TowerView(this.root.querySelector<HTMLCanvasElement>('#tower canvas')!);
+    } catch (e) {
+      console.warn('Rendu 3D indisponible', e);
+      this.root.querySelector<HTMLElement>('#tower')!.remove();
+    }
+    void this.social.publish(G.publicProfile(this.state, Date.now()));
     const frame = () => {
       G.update(this.state, Date.now());
       requestAnimationFrame(frame);
@@ -249,6 +261,45 @@ export class App {
       case 'achievement':
         this.check(G.claimAchievement(s, a[0]), 'Succès récupéré');
         break;
+      case 'season': {
+        const res = G.claimSeasonReward(s, a[0], now);
+        if (res.ok) this.toast(`Palier récupéré : ${rewardLabel(res.value, s.level)}`);
+        else this.toast(res.error);
+        break;
+      }
+      case 'rename': {
+        const name = prompt('Votre nom de directeur·rice :', s.social.name);
+        if (name !== null) this.check(G.setPlayerName(s, name), 'Nom enregistré');
+        break;
+      }
+      case 'addFriend': {
+        const code = prompt('Code ami à ajouter :');
+        if (code) void this.addFriend(code);
+        break;
+      }
+      case 'gift': {
+        const res = G.sendGift(s, a[0], now);
+        if (res.ok) {
+          void this.social.deliverGift(res.value);
+          this.toast('Cadeau envoyé 🎁');
+        } else this.toast(res.error);
+        break;
+      }
+      case 'visit': {
+        const res = G.visitFriend(s, a[0], now);
+        if (res.ok) this.toast(`Visite : +${fmt(res.value.coins)} 🪙${res.value.miles ? ' +1 ✈️' : ''}`);
+        else this.toast(res.error);
+        break;
+      }
+      case 'removeFriend':
+        this.check(G.removeFriend(s, a[0]), 'Ami retiré');
+        break;
+      case 'weekly': {
+        const res = G.claimWeeklyReward(s, now);
+        if (res.ok) this.toast(`Classement de la semaine : +${res.value} ✈️`);
+        else this.toast(res.error);
+        break;
+      }
       case 'franchise': {
         const res = G.franchise(s, now);
         if (res.ok) {
@@ -275,9 +326,14 @@ export class App {
     this.root.querySelector('#tabs')!.innerHTML = (Object.keys(TABS) as Tab[])
       .map((t) => btn(TABS[t], 'tab', [t], false, t === this.tab ? 'on' : ''))
       .join('');
+    const towerBox = this.root.querySelector<HTMLElement>('#tower');
+    if (towerBox && this.tower) {
+      towerBox.hidden = this.tab !== 'tour';
+      if (!towerBox.hidden) this.tower.update(s);
+    }
     const panel = this.root.querySelector('#panel')!;
     const scroll = panel.scrollTop;
-    panel.innerHTML = { tour: () => this.tour(now), vols: () => this.vols(now), equipe: () => this.equipe(now), objectifs: () => this.objectifs(now) }[this.tab]();
+    panel.innerHTML = { tour: () => this.tour(now), vols: () => this.vols(now), equipe: () => this.equipe(now), amis: () => this.amis(now), objectifs: () => this.objectifs(now) }[this.tab]();
     panel.scrollTop = scroll;
     const modal = this.root.querySelector<HTMLElement>('#modal')!;
     modal.hidden = !this.modal;
@@ -540,6 +596,42 @@ export class App {
       `</div>` + btn('Annuler', 'close');
   }
 
+  private async addFriend(code: string) {
+    const [profile] = await this.social.fetchProfiles([G.normalizeCode(code)]);
+    if (!profile) this.toast('Joueur introuvable : le serveur social n’est pas encore en ligne.');
+    else this.check(G.addFriend(this.state, profile, Date.now()), `${profile.name} ajouté !`);
+    G.save(this.state);
+    this.render();
+  }
+
+  private amis(now: number): string {
+    const s = this.state;
+    G.syncWeek(s, now);
+    const parts = [
+      `<h3>Mon profil</h3><div class="row"><div><b>${esc(s.social.name)}</b><small>Code ami : <b>${esc(s.social.code)}</b></small></div>${btn('✏️', 'rename', [], false, 'small')}</div>`,
+      `<h3>Classement de la semaine</h3>`,
+    ];
+    G.friendsLeaderboard(s, now).forEach((r, k) =>
+      parts.push(`<div class="row${r.me ? ' hint' : ''}"><div><b>${k + 1}. ${esc(r.name)}</b><small>${fmt(r.score)} 🪙 gagnées cette semaine</small></div></div>`),
+    );
+    const last = s.social.lastWeek;
+    if (last && !last.claimed) {
+      parts.push(`<div class="row"><div><b>Semaine passée : ${last.rank}ᵉ sur ${last.players}</b></div>${btn('🏆 Récupérer', 'weekly')}</div>`);
+    }
+    parts.push(`<h3>Amis (${s.social.friends.length}/${G.MAX_FRIENDS})</h3>`);
+    if (!s.social.friends.length) parts.push('<p class="sub">Échangez vos codes pour vous envoyer des cadeaux et visiter vos aéroports. (Le serveur social arrive bientôt : pour l’instant aucun code ne peut être trouvé.)</p>');
+    for (const f of s.social.friends) {
+      const giftDone = s.social.gifts.day === G.dayIndex(now) && s.social.gifts.sent.includes(f.code);
+      const visitDone = s.social.visits.day === G.dayIndex(now) && s.social.visits.codes.includes(f.code);
+      parts.push(
+        `<div class="row"><div><b>${esc(f.profile.name)}</b><small>Niv. ${f.profile.level} · ${f.profile.floors.length} magasins</small></div><div class="acts">` +
+          btn('🎁', 'gift', [f.code], giftDone, 'small') + btn('👀 Visiter', 'visit', [f.code], visitDone, 'small') + btn('✖', 'removeFriend', [f.code], false, 'small') + `</div></div>`,
+      );
+    }
+    parts.push(btn('➕ Ajouter un ami', 'addFriend'));
+    return parts.join('');
+  }
+
   private objectifs(now: number): string {
     const s = this.state;
     G.refreshQuests(s, now);
@@ -557,10 +649,43 @@ export class App {
       parts.push(`<div class="row"><div><b>${esc(q.text)}</b><small>${q.progress}/${q.goal}</small></div>${btn(q.claimed ? '✔' : 'Valider', 'quest', [k], !q.done || q.claimed)}</div>`),
     );
     parts.push(btn('🧰 Coffre des 3 quêtes', 'chest', [], s.quests.chestClaimed || !s.quests.claimed.every(Boolean)));
+    const season = G.seasonView(s, now);
+    if (season) {
+      const def = season.season.def;
+      const country = COUNTRY_BY_ID[def.country];
+      parts.push(
+        `<h3>${def.emoji} ${esc(def.name)}</h3><div class="row hint"><div><b>${fmt(season.points)} ${def.currency.emoji} ${esc(def.currency.name)}</b>` +
+          `<small>${esc(def.text)} Vols vers ${country.emoji} ${country.name} : points doublés. Fin dans ${dur(season.season.endsAt - now)}.</small></div></div>`,
+      );
+      season.track.forEach((step, k) =>
+        parts.push(
+          `<div class="row"><div><b>${rewardLabel(step.reward, s.level, SHOP_BY_ID[def.shopId]?.name)}</b><small>${fmt(Math.min(season.points, step.points))}/${fmt(step.points)} ${def.currency.emoji}</small></div>` +
+            btn(step.claimed ? '✔' : 'Prendre', 'season', [k], !step.reached || step.claimed) + `</div>`,
+        ),
+      );
+    } else {
+      const next = G.nextSeason(now);
+      parts.push(`<h3>Événement saisonnier</h3><p class="sub">Prochain : ${next.def.emoji} ${esc(next.def.name)} dans ${dur(next.startsAt - now)}.</p>`);
+    }
     parts.push('<h3>Succès</h3>');
     for (const a of G.achievementViews(s).filter((x) => !x.claimed).slice(0, 8)) {
       parts.push(`<div class="row"><div><b>${esc(a.def.text)}</b><small>${fmt(a.progress)}/${fmt(a.def.goal)} · +${a.def.miles} ✈️</small></div>${btn('Valider', 'achievement', [a.def.id], !a.done)}</div>`);
     }
     return parts.join('');
+  }
+}
+
+function rewardLabel(r: SeasonReward, level: number, shopName = 'Magasin exclusif'): string {
+  switch (r.kind) {
+    case 'miles':
+      return `${r.amount} ✈️`;
+    case 'coins':
+      return `${fmt(r.perLevel * level)} 🪙`;
+    case 'recruit':
+      return r.premium ? 'Recrue premium' : 'Recrue';
+    case 'shop':
+      return `Plan : ${shopName}`;
+    case 'trophy':
+      return `Trophée + ${r.miles} ✈️`;
   }
 }
