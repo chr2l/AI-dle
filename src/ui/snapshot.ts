@@ -7,7 +7,7 @@ import { SHOP_BY_ID } from '../core/data/shops';
 import type { Element } from '../core/types';
 import { buildFloorModel } from '../render/models/floor';
 import { buildPlaneModel } from '../render/models/plane';
-import { buildVipModel, VIP_LOOKS } from '../render/models/vip';
+import { buildFigure, buildVipModel, GUIDE_LOOK, VIP_LOOKS } from '../render/models/vip';
 import { PixelRenderer } from '../render/pixelRenderer';
 import { meshFromGrid } from '../render/tower';
 import type { VoxelGrid } from '../render/voxel';
@@ -71,4 +71,9 @@ export function vipSnapshot(id: string): string | undefined {
 export function shopSnapshot(defId: string): string | undefined {
   const shop = SHOP_BY_ID[defId];
   return render(`shop:${defId}`, () => shop && buildFloorModel({ shop, seed: 1 }), 120, 96, 1.2);
+}
+
+/** Portrait of Capucine, the guide of the journal and banners. */
+export function guideSnapshot(): string | undefined {
+  return render('guide', () => buildFigure(GUIDE_LOOK), 96, 96, 0.95, '#2b2a1a', true);
 }

@@ -77,9 +77,17 @@ const X = 3; // left edge of the head (head is 5 wide: X..X+4)
 const Z = 1; // back of the head (head is 4 deep: Z..Z+3); the face is at Z+3
 const HEAD_Y = 7; // head spans HEAD_Y..HEAD_Y+3
 
+/** Capucine, the ground chief who guides the player (plan de polish IP-24): navy uniform, gold trim, clipboard. */
+export const GUIDE_LOOK: VipLook = { skin: SKIN.light, hair: 'bun', hairColor: 0x6b3a1e, hat: 'cap', hatColor: 0x1d3a7a, face: ['lipstick'], top: 0x1d3a7a, bottom: 0x1d3a7a, trim: GOLD, prop: 'notebook', propColor: WHITE };
+
 export function buildVipModel(id: string): VoxelGrid {
   const look = VIP_LOOKS[id];
   if (!look) throw new Error(`No look for VIP ${id}`);
+  return buildFigure(look);
+}
+
+/** Builds a chibi figure from a look (VIPs and the guide). */
+export function buildFigure(look: VipLook): VoxelGrid {
   const g = new VoxelGrid(VIP_SIZE.width, VIP_SIZE.height, VIP_SIZE.depth);
   const face = new Set(look.face ?? []);
   const hairColor = look.hairColor ?? BLACK;

@@ -87,3 +87,8 @@ button .c, .jhint, #tabs button { font-size: 13px; }
   #modal { justify-content: center; }
   #modal .card { max-width: 560px; border-radius: 20px 20px 0 0; }
 }
+
+/* --- Capucine, the guide (plan de polish IP-24) ----------------------------- */
+img.pic.guide { width: 30px; height: 30px; border-radius: 50%; object-fit: cover; vertical-align: middle; border: 2px solid var(--accent-d); }
+.jhead img.pic.guide { width: 24px; height: 24px; margin-right: 2px; }
+img.pic.guide.xl { width: 84px; height: 84px; border-width: 3px; }
