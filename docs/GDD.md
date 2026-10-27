@@ -393,6 +393,7 @@ Toutes les intégrations passent par `src/core/monetization.ts`.
 | `free_recruit` | Recrutement gratuit (1 / 4 h) |
 | `reroll_shop` | Relance un tirage de magasin |
 | `offline_x2` | ×2 gains hors ligne |
+| `boost` | Ventes des magasins ×2 pendant 4 h (cumulable jusqu'à 12 h) |
 | `repair` | Réparation instantanée |
 | Boutique (IAP) | Packs de Miles / pièces (ci-dessous) |
 
@@ -406,9 +407,10 @@ Toutes les intégrations passent par `src/core/monetization.ts`.
 | Sac de Miles | 4,99 € | 170 ✈️ |
 | Valise de Miles | 9,99 € | 380 ✈️ |
 | Soute de Miles | 19,99 € | 850 ✈️ |
-| Pack de départ (une fois) | 2,99 € | 100 ✈️ + 20 000 🪙 |
+| Pack de départ (une fois, proposé dès le niveau 5 ou après une Franchise) | 2,99 € | 100 ✈️ + 20 000 🪙 |
+| Pass Commandant (une fois) | 7,99 € | Pubs récompensées sans limite quotidienne, +10 % de revenus des magasins pour toujours |
 
-Plus tard : AdMob (pubs récompensées) + achats in-app via plugins Capacitor, sans toucher au gameplay.
+Boutique : toucher le compteur de Miles. Aucune pub interstitielle, jamais. Plus tard : AdMob (pubs récompensées) + achats in-app via plugins Capacitor, branchés dans `showRewardedAd` et `purchase` (voir docs/MONETISATION.md), sans toucher au gameplay.
 
 ## 14. Prestige « Franchise »
 Revendre l'aéroport pour en ouvrir un dans une nouvelle ville.
@@ -416,7 +418,7 @@ Revendre l'aéroport pour en ouvrir un dans une nouvelle ville.
 - Débloquée au **niveau 12**, et seulement si elle rapporte au moins 1 étoile.
 - **Étoiles d'Alliance** sur toute la carrière : `⌊√(pièces gagnées au total / 1 M)⌋`. Une Franchise donne les étoiles gagnées depuis la précédente. Il faut donc 4× plus de pièces pour doubler ses étoiles : la boucle ralentit naturellement.
 - Chaque étoile : **+5 % de revenus** des magasins et des billets, pour toujours.
-- **On garde** : étoiles, Miles (monnaie premium, jamais perdue), équipage **légendaire** (désaffecté), Carnet VIP, album, Dex et compteur de pitié des boîtes, succès, statistiques de carrière, série quotidienne et quêtes du jour, couleurs, missions d'onboarding terminées.
+- **On garde** : étoiles, Miles (monnaie premium, jamais perdue), équipage **légendaire** (désaffecté), Carnet VIP, album, Dex et compteur de pitié des boîtes, succès, statistiques de carrière, série quotidienne et quêtes du jour, couleurs, missions d'onboarding terminées, achats (Pass Commandant, packs uniques).
 - **On repart de zéro** : pièces (300), niveau, étages, magasins, avions (un Coucou), équipage non légendaire, ressources, recherches, pays découverts, plans, VIP.
 - Rythme mesuré (joueur assidu) : 1re Franchise vers le jour 5 (+20 ⭐, revenus ×2), puis la partie suivante retrouve le niveau 11 en 2 jours et va plus loin (niveau 15 au jour 20, 3 Franchises en 30 jours).
 
@@ -444,7 +446,8 @@ Revendre l'aéroport pour en ouvrir un dans une nouvelle ville.
 - ✅ Franchise (prestige)
 - ✅ Rétention : cadeau quotidien, quêtes du jour, succès, album, pays de la semaine, notifications planifiées (§18)
 - ✅ Événements saisonniers à thème (§19) et social : amis, cadeaux, visites, classements (§20), côté moteur
-- ⏳ Post-MVP : vrai serveur social, sons, Capacitor (notifications locales réelles), vrais SDK pubs/IAP
+- ✅ Polish (plan IP-01 à IP-20) : sauvegarde blindée, Réglages, retour Android, rappels locaux, musique, boutique (boost, Pass), captures automatiques, workflow de release (docs/PLAY-STORE.md)
+- ⏳ Post-MVP : vrai serveur social, vrais SDK pubs/IAP (docs/MONETISATION.md), version anglaise
 
 ## 18. Durée de vie et rétention
 

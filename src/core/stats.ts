@@ -1,4 +1,5 @@
 // Derived values computed from the state (never stored in the save).
+import { PASS_ID, PASS_INCOME_PCT } from './monetization';
 import { COUNTRY_BY_ID } from './data/countries';
 import { CREW_RARITY, TRAIT_BY_ID } from './data/crew';
 import { MODULES, MODULE_BY_ID, PLANE_BY_ID } from './data/planes';
@@ -129,7 +130,8 @@ export function shopRate(state: GameState, floorIndex: number): number {
     (1 + TRAFFIC_BONUS * (state.level - 1)) *
     (1 + ADJACENCY_BONUS * neighbors) *
     (1 + decoBonuses(state).shopIncomePct + carnetBonus(state) + albumBonus(state)) *
-    prestigeMult(state)
+    prestigeMult(state) *
+    (state.purchases?.includes(PASS_ID) ? 1 + PASS_INCOME_PCT : 1)
   );
 }
 

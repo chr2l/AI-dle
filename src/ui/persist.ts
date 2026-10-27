@@ -21,6 +21,11 @@ const local = (key: string) => {
   }
 };
 
+/** Demo mode: nothing is written. */
+export function freezeSaves() {
+  frozen = true;
+}
+
 export async function loadGame(now: number): Promise<GameState | null> {
   const candidates = [local(G.SAVE_KEY), local(G.BACKUP_KEY)];
   if (native) {

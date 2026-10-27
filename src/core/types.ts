@@ -206,7 +206,9 @@ export interface GameState {
   missionIndex: number;
   stats: GameStats;
 
-  boosts: { arrivalsX2Until?: number };
+  boosts: { arrivalsX2Until?: number; /** Shop sales earn double until then (ad boost). */ coinsX2Until?: number };
+  /** In-app purchases already made (one-time packs, Pass Commandant). */
+  purchases: string[];
   cooldowns: Record<string, number>;
   timers: { vipCheck: number; guideCheck: number };
 

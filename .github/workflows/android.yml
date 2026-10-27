@@ -30,6 +30,8 @@ jobs:
       - run: npm ci
       - run: npm test
       - run: npm run build
+        env:
+          VITE_TELEMETRY_URL: ${{ vars.VITE_TELEMETRY_URL }}
       # Le projet natif est généré à la volée tant qu'il n'est pas versionné.
       - name: Projet Android (Capacitor)
         run: |
