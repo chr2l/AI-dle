@@ -6,6 +6,7 @@ import { buildPlaneModel } from './models/plane';
 import { buildCarModel, buildCloudModel, buildSceneryModel, RUNWAY_CENTER_Z, SCENERY, skyColor } from './models/scenery';
 import { pick, rng } from './palette';
 import { meshFromGrid } from './tower';
+import { buildHorizon } from './models/horizon';
 
 /**
  * The living airport around the tower: themed scenery, parked planes, planes
@@ -113,6 +114,7 @@ function disposeTree(node: Object3D) {
 export class AirportScene {
   readonly group = new Group();
   private scenery?: Object3D;
+  private horizon?: Object3D;
   private theme: Element | null = null;
   private parked = new Map<string, Object3D>();
   private flights: Flight[] = [];
@@ -185,10 +187,13 @@ export class AirportScene {
   setTheme(element: Element) {
     if (element === this.theme) return;
     this.theme = element;
-    if (this.scenery) {
-      disposeTree(this.scenery);
-      this.group.remove(this.scenery);
+    for (const old of [this.scenery, this.horizon]) {
+      if (!old) continue;
+      disposeTree(old);
+      this.group.remove(old);
     }
+    this.horizon = buildHorizon(element);
+    this.group.add(this.horizon);
     this.scenery = meshFromGrid(buildSceneryModel(element));
     const { origin } = SCENERY;
     this.scenery.position.set(origin.x, origin.y, origin.z);

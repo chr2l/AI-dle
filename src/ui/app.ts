@@ -230,10 +230,33 @@ export class App {
     }, { passive: true });
   }
 
+  /**
+   * The free part of the screen between the floating HUD and the panel or
+   * tab bar: the camera centers the tower there, and the overlays laid on
+   * the scene (journal, lift, bubbles, toast) stay inside it.
+   */
+  private fitScene() {
+    const box = this.root.getBoundingClientRect();
+    const below = (id: string) => this.root.querySelector<HTMLElement>(id)!;
+    const guide = below('#guide');
+    const top = Math.max(below('#hud').getBoundingClientRect().bottom, guide.hidden ? 0 : guide.getBoundingClientRect().bottom) - box.top;
+    const panel = below('#panel').getBoundingClientRect();
+    const floor = this.tab === 'tour' ? panel.top : below('#tabs').getBoundingClientRect().top;
+    const bottom = Math.max(0, box.bottom - floor);
+    this.root.style.setProperty('--top', `${Math.round(top)}px`);
+    this.root.style.setProperty('--bottom', `${Math.round(bottom)}px`);
+    // Tablet / landscape: the panel stands on the right, the tower moves left of it.
+    const right = WIDE.matches ? Math.max(0, box.right - panel.left) : 0;
+    if (this.tower) this.tower.inset = { top, bottom: this.tab === 'tour' && !WIDE.matches ? bottom : 0, right };
+  }
+
   /** Idle loop: simulation every frame, redraw every second, autosave. */
   start() {
     try {
       this.tower = new TowerView(this.root.querySelector<HTMLCanvasElement>('#tower canvas')!);
+      const fit = () => this.fitScene();
+      const watch = new ResizeObserver(fit);
+      for (const id of ['#hud', '#guide', '#panel', '#tabs']) watch.observe(this.root.querySelector(id)!);
       this.tower.onFocus = (stop) => {
         this.stopAt = stop;
         sound('whoosh');
@@ -1003,7 +1026,7 @@ export class App {
     const lines = G.careerLines(s, this.now);
     return (
       sheetHead(`👤 ${esc(s.social.name)}`, `Code ami ${esc(s.social.code)}`) +
-      `<div class="card"><b>⭐ Niveau ${s.level}</b>${bar(s.xp / xpNeed, 'xp')}<small>${fmt(s.xp)}/${fmt(xpNeed)} XP · chaque dépense et chaque vol en rapporte. Monter ouvre des étages, des avions et des pays.</small></div>` +
+      `<div class="card"><b>⭐ Niveau ${s.level}</b>${bar(s.xp / xpNeed, 'xp')}<small>${fmt(s.xp)}/${fmt(xpNeed)} XP · <span>chaque dépense et chaque vol en rapporte. Monter ouvre des étages, des avions et des pays.</span></small></div>` +
       `<h3>Carrière</h3><div class="career">${lines.map((l) => `<div><span>${l.icon}</span><b>${l.coins ? fmt(l.value) : l.value.toLocaleString(currentLang() === 'en' ? 'en-US' : 'fr-FR')}</b><small>${l.label}</small></div>`).join('')}</div>` +
       (this.tower ? button({ act: 'photo', label: '📷 Photo de mon aéroport', sub: 'À partager avec vos amis', kind: 'main', wide: true }) : '') +
       button({ act: 'close', label: 'Fermer', kind: 'ghost', wide: true })
@@ -1096,12 +1119,11 @@ export class App {
         `<span class="ti">${t.icon}</span><span>${t.name}</span>${badges[t.id] ? `<i class="badge">${badges[t.id] > 9 ? '9+' : badges[t.id]}</i>` : ''}</button>`,
     ).join(''));
 
-    const towerBox = this.root.querySelector<HTMLElement>('#tower')!;
-    if (this.tower) this.tower.paused = !!this.sheet;
-    // Tablet or landscape: the tower stays on the left of every tab (plan de polish IP-30).
+    // The scene fills the screen behind every tab (refonte B+C); away from
+    // the Tour tab it is only a backdrop, drawn at a few frames per second.
     const tour = this.tab === 'tour';
-    towerBox.hidden = !tour && !WIDE.matches;
-    if (!towerBox.hidden) {
+    if (this.tower) this.tower.paused = !!this.sheet || !tour;
+    {
       this.tower?.update(s);
       morph(this.root.querySelector('#journal')!, tour ? this.journal(now, step) : '');
       morph(this.root.querySelector('#lift')!, tour ? this.lift(now) : '');
@@ -1118,6 +1140,7 @@ export class App {
     if (!sameView) panel.innerHTML = '';
     morph(panel, { tour: () => this.tour(now), vols: () => this.vols(now), equipe: () => this.equipe(now), amis: () => this.amis(now), objectifs: () => this.objectifs(now) }[this.tab]());
     if (!sameView) panel.scrollTop = 0;
+    if (!sameView) this.fitScene();
 
     const modal = this.root.querySelector<HTMLElement>('#modal')!;
     const wasHidden = modal.hidden;
@@ -1208,7 +1231,7 @@ export class App {
       res('coins', '🪙', fmt(this.shownCoins, true), (s.boosts.coinsX2Until ?? 0) > this.now ? `×2 · ${dur(s.boosts.coinsX2Until! - this.now)}` : `+${perSec(G.totalShopRate(s))}/s`, gained ? 'gain' : (s.boosts.coinsX2Until ?? 0) > this.now ? 'boosted' : '') +
       // First steps: Miles and passengers appear when they start to matter.
       (s.missionIndex >= 1 || s.level >= 2 ? res('miles', '✈️', String(s.miles), 'Miles') : '') +
-      (s.missionIndex >= 3 || s.level >= 2 ? res('lounge', '👥', `${Math.floor(s.lounge.passengers)}/${G.loungeCap(s)}`, 'Passagers') : '') +
+      (s.missionIndex >= 3 || s.level >= 2 ? res('lounge', '👥', `${Math.floor(s.lounge.passengers)}/${G.loungeCap(s)}`, 'Salle') : '') +
       `<button class="gear" data-act="settings" aria-label="Réglages">⚙</button></div>` +
       `<button class="lvl" data-act="profile" aria-label="Profil"><b>⭐ Niv. ${s.level}</b>${bar(s.xp / xpNeed, 'xp')}<small>${fmt(s.xp)}/${fmt(xpNeed)} XP</small></button>`);
   }
@@ -1371,7 +1394,7 @@ export class App {
     const shop = floor.shop;
     const def = shop && SHOP_BY_ID[shop.defId];
     const title = `${i + 1}. ${st.icon} ${st.name}${shop ? ` <span class="lv">niv. ${shop.level}${shop.stars > 1 ? ` ${'★'.repeat(shop.stars)}` : ''}</span>` : ''}`;
-    const sub = def ? `<span style="color:${st.color}">${RARITY_INFO[def.rarity].name}</span> · ${st.sub}` : st.sub;
+    const sub = def ? `<span class="rar" style="--rc:${st.color}">${RARITY_INFO[def.rarity].name}</span> · ${st.sub}` : st.sub;
     let acts = '';
     if (floor.buildEndsAt !== undefined) acts = this.rushBtn({ kind: 'build' }, now, 'rush-build');
     else if (!shop) acts = button({ act: 'floor', args: [i], label: '🏪 Ouvrir un magasin', kind: 'main', tuto: 'open' });
@@ -1415,7 +1438,7 @@ export class App {
     if (bet) {
       const [from, to] = [RARITY_INFO[bet.from], RARITY_INFO[bet.to]];
       const lower = G.RARITIES[G.RARITIES.indexOf(bet.from) - 1];
-      html += `<h3>🎲 Pari de rareté</h3><div class="card bet"><p class="sub">Magasin neuf : tentez de le changer en magasin <b style="color:${to.color}">${to.name}</b> du même type. À faire avant de commander : ensuite, c’est trop tard.</p>` +
+      html += `<h3>🎲 Pari de rareté</h3><div class="card bet"><p class="sub">Magasin neuf : tentez de le changer en magasin <span class="rar" style="--rc:${to.color}">${to.name}</span> du même type. À faire avant de commander : ensuite, c’est trop tard.</p>` +
         `<div class="betline"><span class="rar" style="--rc:${from.color}">${from.name}</span><span>→</span><span class="rar" style="--rc:${to.color}">${to.name}</span></div><div class="btns">` +
         button({ act: 'bet', args: [i, 'sure'], label: `Mise sûre · ${Math.round(bet.chance * 100)} %`, sub: `${fmt(bet.cost)} 🪙 · perdu = rien ne change`, kind: 'main', why: lack(s.coins, bet.cost, 'pièces 🪙') }) +
         (bet.riskyChance !== undefined
@@ -1462,7 +1485,7 @@ export class App {
       const odds = G.boxOdds(s, b.id).filter((o) => o.chance > 0);
       html += `<div class="card box" data-key="box-${b.id}"><div class="line"><span class="boxicon">${b.emoji}</span><div class="grow"><b>${esc(b.name)}</b>` +
         `<div class="odds">${odds.map((o) => `<i style="flex:${o.chance};--rc:${RARITY_INFO[o.rarity].color}"></i>`).join('')}</div>` +
-        `<small class="oddl">${odds.map((o) => `<span style="color:${RARITY_INFO[o.rarity].color}">${RARITY_INFO[o.rarity].name} ${fmtPct(o.chance)}</span>`).join('')}</small></div></div><div class="btns">`;
+        `<small class="oddl">${odds.map((o) => `<span class="rar" style="--rc:${RARITY_INFO[o.rarity].color}">${RARITY_INFO[o.rarity].name} ${fmtPct(o.chance)}</span>`).join('')}</small></div></div><div class="btns">`;
       if (b.id === 'bronze') {
         html += button({ act: 'openBox', args: [b.id, 'ad'], label: '📺 Gratuite', sub: freeAt > now ? `Dans ${dur(freeAt - now)}` : 'Regarder une pub', kind: 'ad', small: true, why: freeAt > now ? `Prochaine caisse gratuite dans ${dur(freeAt - now)}.` : false });
         if (cost.coins !== undefined) html += button({ act: 'openBox', args: [b.id, 'coins'], label: 'Ouvrir', sub: `${fmt(cost.coins)} 🪙`, small: true, kind: 'main', why: lack(s.coins, cost.coins, 'pièces 🪙') });
@@ -1488,7 +1511,7 @@ export class App {
         : same >= 0
           ? button({ act: 'planStar', args: [k, same], label: `★ Étoile · étage ${same + 1}`, small: true, kind: 'main' })
           : chip('Construisez un étage');
-      return `<div class="card"><div class="line"><span class="dexicon">${shopPic(d.id, 'lg')}</span><div class="grow"><b>${esc(d.name)}</b><small style="color:${r.color}">${r.name} · ${CATEGORIES[d.category].name}</small></div>${act}</div></div>`;
+      return `<div class="card"><div class="line"><span class="dexicon">${shopPic(d.id, 'lg')}</span><div class="grow"><b>${esc(d.name)}</b><small><span class="rar" style="--rc:${r.color}">${r.name}</span> · ${CATEGORIES[d.category].name}</small></div>${act}</div></div>`;
     }).join('');
   }
 
@@ -1991,7 +2014,7 @@ export class App {
     const plane = this.state.planes.find((p) => p.uid === m.planeUid);
     const r = RARITY_INFO[m.rarity];
     return `<div class="crew" style="--rc:${r.color}"><span class="savatar">${ROLE_INFO[m.role].emoji}</span><div class="grow"><b>${esc(m.name)}</b>` +
-      `<small><span style="color:${r.color}">${r.name}</span> · ${ROLE_INFO[m.role].name} niv. ${m.level}${m.element !== 'neutre' ? ` · ${COUNTRY_BY_ID[m.element].emoji}` : ''} · ${ROLE_BONUS[m.role](G.crewPoints(m))}</small>` +
+      `<small><span class="rar" style="--rc:${r.color}">${r.name}</span> · ${ROLE_INFO[m.role].name} niv. ${m.level}${m.element !== 'neutre' ? ` · ${COUNTRY_BY_ID[m.element].emoji}` : ''} · ${ROLE_BONUS[m.role](G.crewPoints(m))}</small>` +
       `${m.traits.length ? `<small>${m.traits.map((t) => TRAIT_BY_ID[t]?.name).filter(Boolean).join(', ')}</small>` : ''}<small>${plane ? `✈ ${esc(plane.name)}` : '💤 Pas d’avion'}</small></div></div>`;
   }
 
