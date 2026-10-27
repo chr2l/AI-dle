@@ -46,3 +46,17 @@ button .c, .jhint, #tabs button { font-size: 13px; }
 .todos { display: grid; gap: 6px; margin-bottom: 10px; }
 .todo { display: flex; align-items: center; gap: 10px; padding: 6px 6px 6px 12px; background: #ffffff0d; border-radius: 12px; font-weight: 700; }
 .todo button { flex: none; }
+
+/* --- Boutique: boosted coin counter ---------------------------------------- */
+.res.boosted { border-color: var(--ad); box-shadow: 0 0 10px color-mix(in srgb, var(--ad) 60%, transparent); }
+.res.boosted .rl { color: #d9c2ff; }
+
+/* --- HUD on narrow phones (360 px): counters shrink, the ⚙ stays visible --- */
+.res-row > .res { min-width: 0; }
+.res .rv, .res .rl { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+@media (max-width: 380px) {
+  .res-row { gap: 4px; }
+  .res { padding: 4px 6px; column-gap: 4px; }
+  .res .ri { font-size: 18px; }
+  .res .rv { font-size: 16px; }
+}

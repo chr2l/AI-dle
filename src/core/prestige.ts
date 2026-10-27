@@ -38,6 +38,7 @@ export function franchise(state: GameState, now: number): Result<GameState> {
     quests: state.quests,
     missionIndex: state.missionIndex,
     cooldowns: state.cooldowns,
+    purchases: state.purchases,
     facadeColor: state.facadeColor,
     lobbyColor: state.lobbyColor,
     season: state.season,

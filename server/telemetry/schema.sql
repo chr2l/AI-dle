@@ -1,0 +1,8 @@
+CREATE TABLE IF NOT EXISTS events (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  install_id TEXT NOT NULL,
+  name TEXT NOT NULL,
+  at INTEGER NOT NULL,
+  payload TEXT NOT NULL DEFAULT '{}'
+);
+CREATE INDEX IF NOT EXISTS events_name ON events (name, install_id);

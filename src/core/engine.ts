@@ -162,7 +162,10 @@ export function tick(state: GameState, now: number): TickResult {
     }
     const sold = Math.min(shop.stock, (rate * (now - sellFrom)) / 1000);
     shop.stock -= sold;
-    result.coins += sold;
+    // Ad boost: the share of this interval inside the boost earns double.
+    const boostEnd = state.boosts.coinsX2Until ?? 0;
+    const share = now > sellFrom ? Math.max(0, Math.min(1, (Math.min(now, boostEnd) - sellFrom) / (now - sellFrom))) : 0;
+    result.coins += sold * (1 + share);
   });
   earn(state, result.coins);
 

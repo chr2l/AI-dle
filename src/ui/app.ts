@@ -716,6 +716,16 @@ export class App {
         track('collect_all', { n: res.value.length });
         break;
       }
+      case 'boutique':
+        this.sheet = () => this.boutiqueSheet();
+        track('shop_open');
+        break;
+      case 'adBoost':
+        if (this.check(G.adBoost(s, now), `Ventes ×2 pendant ${G.BOOST_HOURS} h 🚀`)) track('ad', { slot: 'boost' });
+        break;
+      case 'buy':
+        void this.buy(a[0]);
+        break;
       case 'restockAllAsk':
         this.sheet = () => this.restockAllSheet();
         break;
@@ -1099,10 +1109,10 @@ export class App {
     this.lastCoins = s.coins;
     const xpNeed = G.xpToNext(s.level);
     const res = (key: string, icon: string, value: string, label: string, cls = '') =>
-      `<button class="res ${cls}" data-act="help" data-args='["${key}"]' data-res="${key}"><span class="ri">${icon}</span><span class="rv">${value}</span><span class="rl">${label}</span></button>`;
+      `<button class="res ${cls}" ${key === 'miles' ? 'data-act="boutique"' : `data-act="help" data-args='["${key}"]'`} data-res="${key}"><span class="ri">${icon}</span><span class="rv">${value}</span><span class="rl">${label}</span></button>`;
     morph(this.root.querySelector('#hud')!,
       `<div class="res-row">` +
-      res('coins', '🪙', fmt(this.shownCoins, true), `+${perSec(G.totalShopRate(s))}/s`, gained ? 'gain' : '') +
+      res('coins', '🪙', fmt(this.shownCoins, true), (s.boosts.coinsX2Until ?? 0) > this.now ? `×2 · ${dur(s.boosts.coinsX2Until! - this.now)}` : `+${perSec(G.totalShopRate(s))}/s`, gained ? 'gain' : (s.boosts.coinsX2Until ?? 0) > this.now ? 'boosted' : '') +
       // First steps: Miles and passengers appear when they start to matter.
       (s.missionIndex >= 1 || s.level >= 2 ? res('miles', '✈️', String(s.miles), 'Miles') : '') +
       (s.missionIndex >= 3 || s.level >= 2 ? res('lounge', '👥', `${Math.floor(s.lounge.passengers)}/${G.loungeCap(s)}`, 'Passagers') : '') +
@@ -1533,6 +1543,39 @@ export class App {
   private collectAllBtn(): string {
     const n = G.landedPlanes(this.state, this.now).length;
     return button({ act: 'collectAll', label: `📥 Tout récupérer (${n} avions)`, kind: 'main', wide: true, why: this.state.level < G.COLLECT_ALL_LEVEL ? `Se débloque au niveau ${G.COLLECT_ALL_LEVEL}.` : false });
+  }
+
+  /** Shop (tap the Miles counter): ad boost, Pass Commandant, Miles packs. Payments are simulated for now. */
+  private boutiqueSheet(): string {
+    const s = this.state;
+    const now = this.now;
+    const until = s.boosts.coinsX2Until ?? 0;
+    const pass = s.purchases.includes(G.PASS_ID);
+    const packs = G.shopPacks(s);
+    const price = (p: G.IapPack) => `${p.priceEur.toFixed(2).replace('.', ',')} €`;
+    const left = G.adsLeftToday(s, now);
+    let html = sheetHead('🛍️ Boutique', `${s.miles} ✈️ Miles · la monnaie rare, pour finir un chrono ou recruter`) +
+      `<div class="card hint"><b>🚀 Ventes ×2</b><small>Vos magasins rapportent le double pendant ${G.BOOST_HOURS} h, même hors ligne. Cumulable jusqu’à ${G.BOOST_MAX_HOURS} h.${until > now ? ` Actif encore ${dur(until - now)}.` : ''}</small>` +
+      button({ act: 'adBoost', label: `📺 +${G.BOOST_HOURS} h de boost`, sub: pass ? 'Gratuit avec le Pass' : `Regarder une pub · ${Number.isFinite(left) ? `${left} restantes aujourd’hui` : 'illimité'}`, kind: 'ad', wide: true, why: until - now > (G.BOOST_MAX_HOURS - G.BOOST_HOURS) * 3600_000 ? `Boost déjà au maximum (${G.BOOST_MAX_HOURS} h).` : left <= 0 ? 'Plus de pub disponible aujourd’hui.' : false }) + '</div>';
+    if (!pass) {
+      html += `<div class="card"><b>🎖️ Pass Commandant</b><small>Les récompenses des pubs sans limite par jour, et +${G.PASS_INCOME_PCT * 100} % de revenus des magasins pour toujours, même après une Franchise.</small>` +
+        button({ act: 'buy', args: [G.PASS_ID], label: 'Devenir Commandant', sub: price(G.IAP_PACKS.find((p) => p.id === G.PASS_ID)!), kind: 'main', wide: true }) + '</div>';
+    }
+    const starter = packs.find((p) => p.id === 'starter');
+    if (starter) html += `<div class="card hint"><b>🎒 ${starter.name}</b><small>Une seule fois : ${starter.miles} ✈️ et ${fmt(starter.coins!)} 🪙.</small>` + button({ act: 'buy', args: ['starter'], label: 'Prendre le pack', sub: price(starter), kind: 'main', wide: true }) + '</div>';
+    html += `<h3>✈️ Miles</h3><div class="grid">${packs.filter((p) => !p.once).map((p) => button({ act: 'buy', args: [p.id], label: `${p.miles} ✈️`, sub: `${p.name} · ${price(p)}` })).join('')}</div>`;
+    return html + `<p class="sub center">Version de test : aucun paiement n’est demandé, l’offre est donnée tout de suite.</p>`;
+  }
+
+  private async buy(packId: string) {
+    if (!(await G.purchase(packId))) return this.toast('Achat annulé.');
+    const res = G.grantPack(this.state, packId);
+    if (!res.ok) return this.toast(res.error, 'err');
+    track('purchase', { id: packId, eur: res.value.priceEur });
+    if (res.value.miles) this.float(`+${res.value.miles} ✈️`);
+    this.toast(packId === G.PASS_ID ? 'Bienvenue, Commandant ! 🎖️' : `${res.value.name} reçu !`, 'ok');
+    saveGame(this.state);
+    this.render();
   }
 
   private restockAllSheet(): string {

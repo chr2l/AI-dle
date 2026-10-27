@@ -85,6 +85,7 @@ export function createInitialState(now: number, seed = Math.floor(Math.random() 
     stats: emptyStats(),
 
     boosts: {},
+    purchases: [],
     cooldowns: {},
     timers: { vipCheck: now, guideCheck: now },
 
