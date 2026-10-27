@@ -77,3 +77,56 @@ export const chip = (text: string, cls = '') => `<span class="chip ${cls}">${tex
 /** Bottom sheet header with a close cross. */
 export const sheetHead = (title: string, sub = '') =>
   `<div class="sheet-head"><div><h2>${title}</h2>${sub ? `<p class="sub">${sub}</p>` : ''}</div><button class="x" data-act="close" aria-label="Fermer">✕</button></div>`;
+
+/**
+ * Updates `target` to the given HTML in place: nodes that did not change are
+ * kept, so CSS animations do not restart every second, scroll positions hold
+ * and a finger on a button is not lost under a redraw.
+ */
+export function morph(target: Element, html: string) {
+  const tpl = document.createElement('template');
+  tpl.innerHTML = html;
+  morphChildren(target, tpl.content);
+}
+
+function morphChildren(from: Node, to: Node) {
+  const next = [...to.childNodes];
+  let cur = from.firstChild;
+  for (const n of next) {
+    if (!cur) {
+      from.appendChild(n);
+      continue;
+    }
+    if (cur.nodeType !== n.nodeType || cur.nodeName !== n.nodeName) {
+      from.replaceChild(n, cur);
+      cur = n.nextSibling;
+      continue;
+    }
+    if (cur.nodeType === Node.TEXT_NODE) {
+      if (cur.nodeValue !== n.nodeValue) cur.nodeValue = n.nodeValue;
+    } else if (cur.nodeType === Node.ELEMENT_NODE) {
+      morphAttributes(cur as Element, n as Element);
+      morphChildren(cur, n);
+    }
+    cur = cur.nextSibling;
+  }
+  while (cur) {
+    const after = cur.nextSibling;
+    from.removeChild(cur);
+    cur = after;
+  }
+}
+
+/** Classes added by the app after a render (tutorial pulse, flash, shake) survive. */
+const KEEP_CLASSES = ['pulse', 'flash', 'shake', 'bump'];
+
+function morphAttributes(el: Element, to: Element) {
+  for (const { name } of [...el.attributes]) if (!to.hasAttribute(name)) el.removeAttribute(name);
+  for (const { name, value } of [...to.attributes]) {
+    if (name === 'class') {
+      const kept = KEEP_CLASSES.filter((c) => el.classList.contains(c));
+      const want = [value, ...kept].filter(Boolean).join(' ');
+      if (el.getAttribute('class') !== want) el.setAttribute('class', want);
+    } else if (el.getAttribute(name) !== value) el.setAttribute(name, value);
+  }
+}

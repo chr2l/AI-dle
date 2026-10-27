@@ -23,7 +23,7 @@ import './style.css';
 import { TowerView } from './towerView';
 import { confetti, flyTo, haptic, isMuted, sound, toggleMute } from './fx';
 import { FEATURES, guideStep, isTabOpen, tabBadges, unlocked, type Feature, type Tab } from './tutorial';
-import { bar, button, chip, dur, esc, fmt, lack, pips, section, sheetHead, timerBar } from './widgets';
+import { bar, button, chip, dur, esc, fmt, lack, morph, pips, section, sheetHead, timerBar } from './widgets';
 
 export { dur, fmt } from './widgets';
 
@@ -39,6 +39,7 @@ type VolsView = 'avions' | 'pays' | 'recherche';
 
 const WELCOME_KEY = 'idleport.welcome';
 const UNLOCKED_KEY = 'idleport.unlocked';
+const JOURNAL_KEY = 'idleport.journal';
 const storage = {
   get: (k: string) => {
     try {
@@ -73,18 +74,29 @@ function techEffect(t: TechDef): string {
 export class App {
   private tab: Tab = 'tour';
   private volsView: VolsView = 'avions';
-  private sheet: (() => string) | null = null;
-  /** The sheet holds a text field: do not redraw it every second. */
-  private sheetStatic = false;
+  private sheetFn: (() => string) | null = null;
+  /** A new sheet was opened since the last redraw: build it from scratch. */
+  private sheetFresh = false;
+  private get sheet() {
+    return this.sheetFn;
+  }
+  private set sheet(fn: (() => string) | null) {
+    this.sheetFn = fn;
+    this.sheetFresh = true;
+  }
   /** An event choice is waiting: the sheet cannot be dismissed. */
   private sheetLocked = false;
   private toastTimer = 0;
+  private dexTab: G.DexSectionId = 'shops';
   private tower?: TowerView;
   private pointerDown = false;
   private pointer = { x: innerWidth / 2, y: innerHeight / 2 };
   private flash: { key: string; until: number } | null = null;
   private lastCoins = 0;
   private lastLevel = 0;
+  /** Stop shown in the Tour view: 0 = hall, 1..n = floors, beyond = whole tower. */
+  private stopAt = Infinity;
+  private journalOpen: boolean;
   /** Features already announced (see FEATURES). */
   private known: Set<Feature>;
   private offline?: G.TickResult;
@@ -94,7 +106,7 @@ export class App {
   constructor(private state: GameState, private root: HTMLElement) {
     root.innerHTML =
       `<header id="hud"></header><div id="guide"></div>` +
-      `<div id="tower"><canvas></canvas><div id="journal"></div></div>` +
+      `<div id="tower"><canvas></canvas><div id="journal"></div><div id="lift"></div><div id="bubble"></div></div>` +
       `<main id="panel"></main><nav id="tabs"></nav><div id="modal" hidden></div><div id="toast" hidden></div><div id="fx"></div>`;
     root.addEventListener('click', (e) => {
       const target = e.target as HTMLElement;
@@ -120,6 +132,9 @@ export class App {
     this.swipeTabs();
     this.lastCoins = state.coins;
     this.lastLevel = state.level;
+    // Open during the first steps, folded afterwards unless the player chose.
+    const j = storage.get(JOURNAL_KEY);
+    this.journalOpen = j === null ? state.missionIndex < 4 : j === '1';
     let known: Feature[] | null = null;
     try {
       known = JSON.parse(storage.get(UNLOCKED_KEY) ?? 'null');
@@ -171,6 +186,14 @@ export class App {
   start() {
     try {
       this.tower = new TowerView(this.root.querySelector<HTMLCanvasElement>('#tower canvas')!);
+      this.tower.onFocus = (stop) => {
+        this.stopAt = stop;
+        sound('whoosh');
+        this.render();
+      };
+      this.tower.onTap = (stop) => {
+        if (stop >= 1 && stop <= this.state.floors.length) this.run('floor', [stop - 1]);
+      };
     } catch (e) {
       console.warn('Rendu 3D indisponible', e);
       this.root.querySelector<HTMLElement>('#tower canvas')!.remove();
@@ -260,7 +283,6 @@ export class App {
   }
 
   private openInput(title: string, sub: string, value: string, act: string, args: unknown[] = [], max = 20) {
-    this.sheetStatic = true;
     this.sheet = () =>
       sheetHead(title, sub) +
       `<input id="inp" maxlength="${max}" value="${esc(value)}" autocomplete="off" />` +
@@ -277,7 +299,6 @@ export class App {
 
   private closeSheet() {
     this.sheet = null;
-    this.sheetStatic = false;
     this.sheetLocked = false;
   }
 
@@ -328,7 +349,15 @@ export class App {
         this.sheet = () => this.floorSheet(a[0]);
         break;
       case 'build':
-        this.check(G.buildFloor(s, now), 'Construction lancée 🏗️');
+        if (this.check(G.buildFloor(s, now), 'Construction lancée 🏗️')) this.stopAt = s.floors.length;
+        break;
+      case 'goFloor':
+        this.stopAt = a[0];
+        sound('whoosh');
+        break;
+      case 'journal':
+        this.journalOpen = !this.journalOpen;
+        storage.set(JOURNAL_KEY, this.journalOpen ? '1' : '0');
         break;
       case 'rush':
         this.check(G.rush(s, a[0], now), 'Terminé ⚡');
@@ -374,6 +403,55 @@ export class App {
       case 'lounge':
         if (this.check(G.upgradeLounge(s), 'Salle agrandie !')) this.flashKey('lounge');
         break;
+      case 'boxes':
+        this.sheet = () => this.boxSheet();
+        break;
+      case 'openBox': {
+        const res = G.openBox(s, a[0], a[1], now);
+        if (!res.ok) this.toast(res.error, 'err');
+        else {
+          const r = res.value;
+          sound(r.rarity === 'E' || r.rarity === 'L' ? 'levelup' : 'success');
+          haptic('success');
+          if (r.rarity !== 'C') setTimeout(() => this.burst(), 450);
+          this.sheet = () => this.boxResult(a[0], r);
+        }
+        break;
+      }
+      case 'bet': {
+        const res = G.rarityBet(s, a[0], a[1]);
+        if (!res.ok) this.toast(res.error, 'err');
+        else {
+          const r = res.value;
+          const d = SHOP_BY_ID[r.defId];
+          if (r.won) {
+            this.burst();
+            sound('levelup');
+            this.toast(`Gagné ! ${d.emoji} ${d.name} (${RARITY_INFO[d.rarity].name})`, 'ok');
+          } else {
+            sound('error');
+            haptic('error');
+            this.toast(d.rarity === r.from ? 'Perdu : le magasin ne change pas.' : `Perdu : il descend en ${RARITY_INFO[d.rarity].name} (${d.emoji} ${d.name}).`, 'err');
+          }
+          this.sheet = () => this.floorSheet(a[0]);
+        }
+        break;
+      }
+      case 'planStar':
+        if (this.check(G.planAsStar(s, a[0], a[1]), 'Étoile ajoutée ★')) this.burst();
+        break;
+      case 'dex':
+        this.dexTab = a[0] ?? this.dexTab;
+        this.sheet = () => this.dexSheet();
+        break;
+      case 'dexClaim': {
+        const res = G.claimDexReward(s, a[0], a[1]);
+        if (this.check(res)) {
+          this.float(`+${res.value} ✈️`);
+          this.burst();
+        }
+        break;
+      }
       case 'fusionPick':
         this.sheet = () => this.fusionSheet(a[0]);
         break;
@@ -598,7 +676,6 @@ export class App {
     const step = guideStep(s, now);
     const open = unlocked(s);
     if (!isTabOpen(this.tab, open)) this.tab = 'tour';
-    this.root.style.setProperty('--phase', `-${now % 1600}ms`);
     this.renderHud();
     this.celebrate(open);
 
@@ -607,44 +684,48 @@ export class App {
     guide.hidden = !showGuide;
     if (showGuide) {
       const there = TABS.find((t) => t.id === step.tab)!;
-      guide.innerHTML =
+      morph(guide,
         `<span class="bulb">💡</span><p>${esc(step.text)}</p>` +
         (G.currentMission(s)?.done
           ? button({ act: 'mission', label: 'Récupérer', kind: 'main', small: true })
-          : step.tab !== this.tab || (step.view && step.view !== this.volsView) ? button({ act: 'tab', args: [step.tab, step.view], label: `Aller ${there.icon}`, kind: 'main', small: true }) : '');
+          : step.tab !== this.tab || (step.view && step.view !== this.volsView) ? button({ act: 'tab', args: [step.tab, step.view], label: `Aller ${there.icon}`, kind: 'main', small: true }) : ''));
     }
 
     const badges = tabBadges(s, now);
-    this.root.querySelector('#tabs')!.innerHTML = this.openTabs().map(
+    morph(this.root.querySelector('#tabs')!, this.openTabs().map(
       (t) =>
         `<button class="${t.id === this.tab ? 'on' : ''}" data-act="tab" data-args='["${t.id}"]' data-tab="${t.id}">` +
         `<span class="ti">${t.icon}</span><span>${t.name}</span>${badges[t.id] ? `<i class="badge">${badges[t.id] > 9 ? '9+' : badges[t.id]}</i>` : ''}</button>`,
-    ).join('');
+    ).join(''));
 
     const towerBox = this.root.querySelector<HTMLElement>('#tower')!;
     towerBox.hidden = this.tab !== 'tour';
     if (!towerBox.hidden) {
       this.tower?.update(s);
-      this.root.querySelector('#journal')!.innerHTML = this.journal(now, step);
+      morph(this.root.querySelector('#journal')!, this.journal(now, step));
+      morph(this.root.querySelector('#lift')!, this.lift(now));
+      morph(this.root.querySelector('#bubble')!, this.bubble(now));
+      this.tower?.setFocus(this.floorStop);
     }
 
     const panel = this.root.querySelector<HTMLElement>('#panel')!;
     // A new tab or sub-view starts at the top.
     const view = `${this.tab}:${this.volsView}`;
-    const scrolls = panel.dataset.view === view ? this.saveScroll(panel) : new Map<string, number>();
+    const sameView = panel.dataset.view === view;
     panel.dataset.view = view;
     panel.dataset.tab = this.tab;
-    panel.innerHTML = { tour: () => this.tour(now), vols: () => this.vols(now), equipe: () => this.equipe(now), amis: () => this.amis(now), objectifs: () => this.objectifs(now) }[this.tab]();
-    this.restoreScroll(panel, scrolls);
+    if (!sameView) panel.innerHTML = '';
+    morph(panel, { tour: () => this.tour(now), vols: () => this.vols(now), equipe: () => this.equipe(now), amis: () => this.amis(now), objectifs: () => this.objectifs(now) }[this.tab]());
+    if (!sameView) panel.scrollTop = 0;
 
     const modal = this.root.querySelector<HTMLElement>('#modal')!;
     const wasHidden = modal.hidden;
     modal.hidden = !this.sheet;
-    if (this.sheet && (!this.sheetStatic || wasHidden || !modal.querySelector('#inp'))) {
-      const card = modal.querySelector<HTMLElement>('.card');
-      const top = card?.scrollTop ?? 0;
-      modal.innerHTML = `<div class="card${wasHidden ? ' rise' : ''}">${this.sheet()}</div>`;
-      modal.querySelector<HTMLElement>('.card')!.scrollTop = top;
+    if (this.sheet) {
+      const html = this.sheet();
+      if (wasHidden || this.sheetFresh) modal.innerHTML = `<div class="card rise">${html}</div>`;
+      else morph(modal.querySelector('.card')!, html);
+      this.sheetFresh = false;
     }
 
     // Tutorial highlight: the tab to open, else the button to touch.
@@ -653,11 +734,12 @@ export class App {
       if (step.tab !== this.tab && !this.sheet) this.root.querySelector(`#tabs [data-tab="${step.tab}"]`)?.classList.add('pulse');
       else if (step.view && step.view !== this.volsView && !this.sheet) this.root.querySelector(`.seg [data-view="${step.view}"]`)?.classList.add('pulse');
       else if (step.target) {
-        const scope = this.sheet ? modal : this.root;
-        scope.querySelector(`[data-tuto="${step.target}"]`)?.classList.add('pulse');
+        const sel = `[data-tuto="${step.target}"]`;
+        (this.sheet ? modal.querySelector(sel) : panel.querySelector(sel) ?? this.root.querySelector(sel))?.classList.add('pulse');
       }
     }
     if (this.flash && this.flash.until > now) this.root.querySelectorAll(`[data-key="${this.flash.key}"]`).forEach((el) => el.classList.add('flash'));
+    else this.root.querySelectorAll('.flash').forEach((el) => el.classList.remove('flash'));
   }
 
   /** Level ups and newly unlocked features get their moment. */
@@ -691,17 +773,6 @@ export class App {
     setTimeout(() => confetti(fx, center, 30), 150);
   }
 
-  private saveScroll(panel: HTMLElement) {
-    const map = new Map<string, number>([['panel', panel.scrollTop]]);
-    panel.querySelectorAll<HTMLElement>('[data-scroll]').forEach((el) => map.set(el.dataset.scroll!, el.scrollTop));
-    return map;
-  }
-
-  private restoreScroll(panel: HTMLElement, map: Map<string, number>) {
-    panel.scrollTop = map.get('panel') ?? 0;
-    panel.querySelectorAll<HTMLElement>('[data-scroll]').forEach((el) => (el.scrollTop = map.get(el.dataset.scroll!) ?? 0));
-  }
-
   private renderHud() {
     const s = this.state;
     const gained = s.coins > this.lastCoins + 0.5 && s.coins - this.lastCoins > G.totalShopRate(s) * 1.5;
@@ -709,13 +780,13 @@ export class App {
     const xpNeed = G.xpToNext(s.level);
     const res = (key: string, icon: string, value: string, label: string, cls = '') =>
       `<button class="res ${cls}" data-act="help" data-args='["${key}"]' data-res="${key}"><span class="ri">${icon}</span><span class="rv">${value}</span><span class="rl">${label}</span></button>`;
-    this.root.querySelector('#hud')!.innerHTML =
+    morph(this.root.querySelector('#hud')!,
       `<div class="res-row">` +
       res('coins', '🪙', fmt(s.coins), `+${G.totalShopRate(s).toFixed(1)}/s`, gained ? 'gain' : '') +
       res('miles', '✈️', String(s.miles), 'Miles') +
       res('lounge', '👥', `${Math.floor(s.lounge.passengers)}/${G.loungeCap(s)}`, 'Passagers') +
       `<div class="hud-btns"><button class="help-btn" data-act="help" data-args='["welcome"]' aria-label="Comment jouer">?</button><button class="help-btn" data-act="mute" aria-label="Son">${isMuted() ? '🔇' : '🔊'}</button></div></div>` +
-      `<button class="lvl" data-act="help" data-args='["level"]'><b>⭐ Niv. ${s.level}</b>${bar(s.xp / xpNeed, 'xp')}<small>${fmt(s.xp)}/${fmt(xpNeed)} XP</small></button>`;
+      `<button class="lvl" data-act="help" data-args='["level"]'><b>⭐ Niv. ${s.level}</b>${bar(s.xp / xpNeed, 'xp')}<small>${fmt(s.xp)}/${fmt(xpNeed)} XP</small></button>`);
   }
 
   /** Mission journal laid over the tower view. */
@@ -724,7 +795,11 @@ export class App {
     const mission = G.currentMission(s);
     const quests = G.questViews(s, now);
     const questsDone = quests.filter((q) => q.done).length;
-    let html = `<div class="jhead"><b>📋 Journal</b><button class="info" data-act="help" data-args='["mission"]'>ⓘ</button></div>`;
+    if (!this.journalOpen) {
+      return `<button class="jpill${mission?.done ? ' done' : ''}" data-act="journal">📋 ${mission ? (mission.done ? 'Mission accomplie !' : `${mission.progress}/${mission.def.goal}`) : 'Journal'} ▸</button>` +
+        (mission?.done ? button({ act: 'mission', label: 'Récupérer', kind: 'main', small: true, tuto: 'mission' }) : '');
+    }
+    let html = `<div class="jhead"><b>📋 Journal</b><span><button class="info" data-act="help" data-args='["mission"]'>ⓘ</button><button class="info" data-act="journal" aria-label="Replier">▾</button></span></div>`;
     if (mission) {
       html +=
         `<div class="jmission"><b>${esc(mission.def.text)}</b>${bar(mission.progress / mission.def.goal)}` +
@@ -743,99 +818,137 @@ export class App {
 
   // --- Tour ------------------------------------------------------------------
 
-  private tour(now: number): string {
-    const s = this.state;
-    const parts: string[] = [];
-
-    // Hall: lounge, waiting VIPs, lost passenger.
-    const cap = G.loungeCap(s);
-    const upCost = G.loungeUpgradeCost(s.lounge.level);
-    parts.push(section('🛎️ Hall', 'hall'));
-    let hall =
-      `<div class="card" data-key="lounge"><div class="line"><div class="grow"><b>Salle d’embarquement · niv. ${s.lounge.level}</b>` +
-      `<small>${Math.floor(s.lounge.passengers)}/${cap} passagers · +${(G.arrivalRate(s) * 60).toFixed(0)} par minute</small>${bar(s.lounge.passengers / cap, s.lounge.passengers >= cap ? 'full' : 'blue')}</div>` +
-      (s.lounge.level < G.MAX_LOUNGE_LEVEL
-        ? button({ act: 'lounge', label: 'Agrandir', sub: `${fmt(upCost)} 🪙`, small: true, why: lack(s.coins, upCost, 'pièces 🪙') })
-        : chip('MAX')) +
-      `</div>`;
-    if (s.lounge.passengers >= cap) hall += `<p class="note warn">Salle pleine : les nouveaux passagers repartent. Envoyez un avion !</p>`;
-    const vips = s.vips.map((v) => {
-      const def = VIP_BY_ID[v.defId];
-      const c = v.demand && COUNTRY_BY_ID[v.demand.countryId];
-      return `<button class="vip" data-act="vip" data-args='["${v.uid}"]'><span class="vava">${def.emoji}</span><b>${esc(def.name)}</b><small>${def.power ? '⚡ Pouvoir' : `→ ${c!.emoji} ${c!.name}`}</small><small>⏳ ${dur(v.expiresAt - now)}</small></button>`;
-    });
-    if (s.guide) vips.unshift(`<div class="vip lost"><span class="vava">🧍</span><b>Passager perdu</b><small>cherche l’étage ${s.guide.floor}</small><small>⏳ ${dur(s.guide.expiresAt - now)}</small></div>`);
-    hall += vips.length ? `<div class="vips">${vips.join('')}</div>` : `<p class="note">Aucun VIP pour l’instant. Ils passent de temps en temps : revenez souvent !</p>`;
-    parts.push(hall + '</div>');
-
-    // Floors dashboard.
-    const n = s.floors.length + 1;
-    const building = s.floors.some((f) => f.buildEndsAt !== undefined);
-    const max = G.maxFloors(s.level);
-    parts.push(section(`🏢 Étages ${s.floors.length}/${max}`, 'floors'));
-    if (n <= max) {
-      parts.push(
-        `<div class="card build"><div class="line"><div class="grow"><b>➕ Nouvel étage (n° ${n})</b><small>Chantier de ${dur(G.buildDuration(n) * 1000)}</small></div>` +
-          button({
-            act: 'build',
-            label: 'Construire',
-            sub: `${fmt(G.buildCost(n))} 🪙`,
-            kind: 'main',
-            tuto: 'build',
-            why: building ? 'Un chantier est déjà en cours.' : lack(s.coins, G.buildCost(n), 'pièces 🪙'),
-          }) +
-          `</div></div>`,
-      );
-    } else parts.push(`<p class="note">Tour complète pour le niveau ${s.level}. Montez de niveau pour construire plus haut.</p>`);
-    parts.push('<div class="floors">');
-    for (let i = s.floors.length - 1; i >= 0; i--) parts.push(this.floorTile(i, now));
-    parts.push('</div>');
-
-    // Airport buildings.
-    const open = unlocked(s);
-    if (open.has('labo') || open.has('franchise')) parts.push(section('🏛️ Aéroport'));
-    if (open.has('labo')) {
-      const f = s.fusion;
-      parts.push(
-        `<button class="tile wide" data-act="${f ? 'help' : 'fusionPick'}" data-args='${f ? '["lab"]' : '[null]'}' data-tuto="fusion"><span class="ticon">🧪</span><span class="tbody"><b>Laboratoire de fusion</b>` +
-          `<small>${f ? `En cours : ${SHOP_BY_ID[f.a].emoji} + ${SHOP_BY_ID[f.b].emoji} · ${dur(f.endsAt - now)}` : `Fusionnez 2 magasins → plan d’un nouveau magasin`} · ${s.plans.length} plan(s) en réserve</small></span>` +
-          `<span class="tstate">${f ? '⏳' : '›'}</span></button>` +
-          (f ? `<div class="right">${this.rushBtn({ kind: 'fusion' }, now)}</div>` : ''),
-      );
-    }
-    if (s.level >= G.FRANCHISE_LEVEL) {
-      parts.push(`<button class="tile wide" data-act="franchiseAsk"><span class="ticon">🌟</span><span class="tbody"><b>Franchise</b><small>Recommencer avec +${G.pendingStars(s)} ⭐ de prestige</small></span><span class="tstate">›</span></button>`);
-    } else if (open.has('franchise')) parts.push(`<div class="tile wide off"><span class="ticon">🌟</span><span class="tbody"><b>Franchise</b><small>🔒 Se débloque au niveau ${G.FRANCHISE_LEVEL}</small></span></div>`);
-    return parts.join('');
-  }
-
-  /** Compact dashboard tile of a floor; touching it opens its options. */
-  private floorTile(i: number, now: number): string {
+  /** Status of a floor for the lift buttons, the bubble and the dock. */
+  private floorStatus(i: number, now: number) {
     const s = this.state;
     const floor = s.floors[i];
-    const lost = s.guide?.floor === i + 1 ? '<i class="lostmark">🧍</i>' : '';
-    const tile = (icon: string, title: string, sub: string, state: string, extra = '', tuto = '', color = 'var(--line)') =>
-      `<button class="tile" data-act="floor" data-args="[${i}]" data-key="shop-${i}"${tuto ? ` data-tuto="${tuto}"` : ''} style="--rc:${color}">` +
-      `<span class="fnum">${i + 1}</span><span class="ticon">${icon}</span><span class="tbody"><b>${title}</b><small>${sub}</small>${extra}</span><span class="tstate">${state}</span>${lost}</button>`;
     if (floor.buildEndsAt !== undefined) {
-      return tile('🏗️', 'Chantier', `Prêt dans ${dur(floor.buildEndsAt - now)}`, '⏳', timerBar(floor.buildEndsAt, G.buildDuration(i + 1) * 1000, now), 'rush-build');
+      return { icon: '🏗️', name: 'Chantier', sub: `Prêt dans ${dur(floor.buildEndsAt - now)}`, mark: 'wait', tuto: 'rush-build', color: 'var(--line)', bar: timerBar(floor.buildEndsAt, G.buildDuration(i + 1) * 1000, now) };
     }
     const shop = floor.shop;
-    if (!shop) return tile('🚪', 'Étage vide', 'Touchez pour ouvrir un magasin', '<i class="need">!</i>', '', 'open');
+    if (!shop) return { icon: '🚪', name: 'Étage vide', sub: 'Ouvrez-y un magasin', mark: 'need', tuto: 'open', color: 'var(--line)', bar: '' };
     const def = SHOP_BY_ID[shop.defId];
     const rate = G.shopRate(s, i);
     const color = RARITY_INFO[def.rarity].color;
-    const title = `${esc(def.name)} <span class="lv">niv. ${shop.level}${shop.stars > 1 ? ` ${'★'.repeat(shop.stars)}` : ''}</span>`;
+    const name = esc(def.name);
     if (shop.restock) {
       const t = RESTOCK_TIERS[shop.restock.tier];
-      return tile(def.emoji, title, `📦 Livraison dans ${dur(shop.restock.endsAt - now)}`, '⏳', timerBar(shop.restock.endsAt, t.restockSec * 1000, now, 'blue'), '', color);
+      return { icon: def.emoji, name, sub: `📦 Livraison dans ${dur(shop.restock.endsAt - now)}`, mark: 'wait', tuto: '', color, bar: timerBar(shop.restock.endsAt, t.restockSec * 1000, now, 'blue') };
     }
     if (shop.stock > 1e-6) {
       const up = shop.level < G.MAX_SHOP_LEVEL ? G.shopUpgradeCost(def.rarity, shop.level) : Infinity;
-      const left = shop.stock / rate;
-      return tile(def.emoji, title, `${rate.toFixed(1)} 🪙/s · stock pour ${dur(left * 1000)}`, s.coins >= up ? '<i class="can">⬆</i>' : '🪙', '', 'upgrade-shop', color);
+      return { icon: def.emoji, name, sub: `${rate.toFixed(1)} 🪙/s · stock pour ${dur((shop.stock / rate) * 1000)}`, mark: s.coins >= up ? 'can' : '', tuto: 'upgrade-shop', color, bar: '' };
     }
-    return tile(def.emoji, title, '<span class="warn">Rayons vides ! Touchez pour commander</span>', '<i class="need">!</i>', '', 'restock', color);
+    return { icon: def.emoji, name, sub: '<span class="warn">Rayons vides !</span>', mark: 'need', tuto: 'restock', color, bar: '' };
+  }
+
+  private get floorStop() {
+    return Math.max(0, Math.min(this.state.floors.length + 1, this.stopAt));
+  }
+
+  /** Lift panel on the side of the view: one button per stop, top to bottom. */
+  private lift(now: number): string {
+    const s = this.state;
+    const stop = this.floorStop;
+    const n = s.floors.length;
+    const building = s.floors.some((f) => f.buildEndsAt !== undefined);
+    const canBuild = !building && n + 1 <= G.maxFloors(s.level);
+    const btn = (k: number, label: string, mark: string, tuto = '') =>
+      `<button class="liftb${k === stop ? ' on' : ''}" data-act="goFloor" data-args="[${k}]"${tuto ? ` data-tuto="${tuto}"` : ''}>${label}${mark ? `<i class="m ${mark}"></i>` : ''}</button>`;
+    const freeBox = s.level >= 2 && G.freeBoxReadyAt(s) <= now;
+    let html = btn(n + 1, '🏙️', canBuild && s.coins >= G.buildCost(n + 1) ? 'can' : freeBox ? 'vip' : '', canBuild ? 'build' : '');
+    for (let i = n - 1; i >= 0; i--) {
+      const st = this.floorStatus(i, now);
+      html += btn(i + 1, `<span>${i + 1}</span>`, s.guide?.floor === i + 1 ? 'lost' : st.mark, st.tuto);
+    }
+    html += btn(0, '🛎️', s.vips.length ? 'vip' : '');
+    return html;
+  }
+
+  /** Bubble over the focused stop: what it needs, touch to act. */
+  private bubble(now: number): string {
+    const s = this.state;
+    const stop = this.floorStop;
+    const n = s.floors.length;
+    if (stop === 0) {
+      return s.vips.map((v) => `<button class="bub vipb" data-act="vip" data-args='["${v.uid}"]'>${VIP_BY_ID[v.defId].emoji}<small>${VIP_BY_ID[v.defId].power ? '⚡' : COUNTRY_BY_ID[v.demand!.countryId].emoji}</small></button>`).join('') +
+        (s.guide ? `<span class="bub info">🧍 étage ${s.guide.floor} ?</span>` : '');
+    }
+    if (stop > n) return s.level >= 2 && G.freeBoxReadyAt(s) <= now ? `<button class="bub can" data-act="boxes">🎁 Caisse gratuite</button>` : '';
+    const st = this.floorStatus(stop - 1, now);
+    const lost = s.guide?.floor === stop ? button({ act: 'guide', args: [stop], label: '🧍 Guider ici', kind: 'main', small: true }) : '';
+    if (st.mark === 'need') return `<button class="bub need" data-act="floor" data-args="[${stop - 1}]">❗ ${st.tuto === 'open' ? 'Ouvrir un magasin' : 'Commander'}</button>${lost}`;
+    if (st.mark === 'can') return `<button class="bub can" data-act="floor" data-args="[${stop - 1}]">⬆ Améliorable</button>${lost}`;
+    return lost;
+  }
+
+  /** Compact dock under the view: the focused stop and its actions. */
+  private tour(now: number): string {
+    const s = this.state;
+    const stop = this.floorStop;
+    const n = s.floors.length;
+    const nav = (title: string, sub: string) =>
+      `<div class="dock-head"><button class="nav" data-act="goFloor" data-args="[${stop - 1}]"${stop <= 0 ? ' disabled' : ''} aria-label="Descendre">▼</button>` +
+      `<div class="grow"><b>${title}</b><small>${sub}</small></div>` +
+      `<button class="nav" data-act="goFloor" data-args="[${stop + 1}]"${stop > n ? ' disabled' : ''} aria-label="Monter">▲</button></div>`;
+
+    if (stop === 0) {
+      const cap = G.loungeCap(s);
+      const upCost = G.loungeUpgradeCost(s.lounge.level);
+      return nav('🛎️ Hall · salle d’embarquement', `${Math.floor(s.lounge.passengers)}/${cap} passagers · +${(G.arrivalRate(s) * 60).toFixed(0)}/min`) +
+        `<div class="dock-body" data-key="lounge">${bar(s.lounge.passengers / cap, s.lounge.passengers >= cap ? 'full' : 'blue')}` +
+        (s.lounge.passengers >= cap ? `<small class="warn">Salle pleine : envoyez un avion !</small>` : '') +
+        `<small>${s.vips.length ? `${s.vips.length} VIP dans le hall : touchez-les dans la vue.` : 'Aucun VIP pour l’instant.'}${s.guide ? ` Un passager cherche l’étage ${s.guide.floor}.` : ''}</small>` +
+        `<div class="btns">${s.lounge.level < G.MAX_LOUNGE_LEVEL ? button({ act: 'lounge', label: `Agrandir (niv. ${s.lounge.level + 1})`, sub: `${fmt(upCost)} 🪙 · +10 places`, small: true, why: lack(s.coins, upCost, 'pièces 🪙') }) : chip('Salle au maximum')}` +
+        `${button({ act: 'help', args: ['hall'], label: 'ⓘ', small: true, kind: 'ghost' })}</div></div>`;
+    }
+
+    if (stop > n) {
+      const next = n + 1;
+      const building = s.floors.some((f) => f.buildEndsAt !== undefined);
+      const max = G.maxFloors(s.level);
+      const open = unlocked(s);
+      let html = nav(`🏙️ Votre tour · ${n}/${max} étages`, `${G.totalShopRate(s).toFixed(1)} 🪙/s · glissez la vue ou ▼ pour visiter les étages`) + '<div class="dock-body"><div class="btns">';
+      html += next <= max
+        ? button({ act: 'build', label: `➕ Construire l’étage ${next}`, sub: `${fmt(G.buildCost(next))} 🪙 · ${dur(G.buildDuration(next) * 1000)}`, kind: 'main', tuto: 'build', why: building ? 'Un chantier est déjà en cours.' : lack(s.coins, G.buildCost(next), 'pièces 🪙') })
+        : chip(`Tour complète pour le niveau ${s.level}`);
+      if (open.has('labo')) {
+        const f = s.fusion;
+        html += f
+          ? button({ act: 'help', args: ['lab'], label: `🧪 ${SHOP_BY_ID[f.a].emoji}+${SHOP_BY_ID[f.b].emoji}`, sub: dur(f.endsAt - now), small: true }) + this.rushBtn({ kind: 'fusion' }, now)
+          : button({ act: 'fusionPick', args: [null], label: '🧪 Fusion', sub: `${s.plans.length} plan(s)`, small: true, tuto: 'fusion' });
+      }
+      if (open.has('boites')) {
+        const free = G.freeBoxReadyAt(s) <= now;
+        html += button({ act: 'boxes', label: '🎁 Boîtes', sub: free ? 'Une gratuite !' : `${s.plans.length} plan(s)`, small: true, kind: free ? 'ad' : undefined, tuto: 'boxes' });
+      }
+      if (s.level >= G.FRANCHISE_LEVEL) html += button({ act: 'franchiseAsk', label: '🌟 Franchise', sub: `+${G.pendingStars(s)} ⭐`, small: true });
+      else if (open.has('franchise')) html += button({ act: 'franchiseAsk', label: '🌟 Franchise', sub: `Niveau ${G.FRANCHISE_LEVEL}`, small: true, why: `Se débloque au niveau ${G.FRANCHISE_LEVEL}.` });
+      return html + '</div></div>';
+    }
+
+    const i = stop - 1;
+    const st = this.floorStatus(i, now);
+    const floor = s.floors[i];
+    const shop = floor.shop;
+    const def = shop && SHOP_BY_ID[shop.defId];
+    const title = `${i + 1}. ${st.icon} ${st.name}${shop ? ` <span class="lv">niv. ${shop.level}${shop.stars > 1 ? ` ${'★'.repeat(shop.stars)}` : ''}</span>` : ''}`;
+    const sub = def ? `<span style="color:${st.color}">${RARITY_INFO[def.rarity].name}</span> · ${st.sub}` : st.sub;
+    let acts = '';
+    if (floor.buildEndsAt !== undefined) acts = this.rushBtn({ kind: 'build' }, now, 'rush-build');
+    else if (!shop) acts = button({ act: 'floor', args: [i], label: '🏪 Ouvrir un magasin', kind: 'main', tuto: 'open' });
+    else if (shop.restock) acts = this.rushBtn({ kind: 'restock', floor: i }, now) + button({ act: 'express', args: [i], label: '📺 Express', sub: 'Pub', kind: 'ad', small: true });
+    else if (shop.stock <= 1e-6) {
+      acts = RESTOCK_TIERS.map((t, k) => button({ act: 'restock', args: [i, k], label: CATEGORIES[def!.category].products[k], sub: `${dur(t.restockSec * 1000)} → ${dur(t.durationSec * 1000)}`, small: true, kind: k === 0 ? 'main' : undefined, tuto: 'restock' })).join('');
+    }
+    if (shop && shop.level < G.MAX_SHOP_LEVEL && !(shop.stock <= 1e-6 && !shop.restock)) {
+      const up = G.shopUpgradeCost(def!.rarity, shop.level);
+      acts += button({ act: 'upgradeShop', args: [i], label: '⬆️ Améliorer', sub: `${fmt(up)} 🪙`, small: true, kind: shop.stock > 1e-6 ? 'main' : undefined, tuto: 'upgrade-shop', why: lack(s.coins, up, 'pièces 🪙') });
+    }
+    if (G.rarityBetView(s, i)) acts += button({ act: 'floor', args: [i], label: '🎲 Pari', sub: 'Rareté', small: true });
+    if (s.guide?.floor === stop) acts += button({ act: 'guide', args: [stop], label: '🧍 Guider', kind: 'main', small: true });
+    acts += button({ act: 'floor', args: [i], label: '⋯', small: true, kind: 'ghost' });
+    return nav(title, sub) + `<div class="dock-body" data-key="shop-${i}" style="--rc:${st.color}">${st.bar}<div class="btns">${acts}</div></div>`;
   }
 
   private floorSheet(i: number): string {
@@ -852,7 +965,7 @@ export class App {
     if (!shop) {
       return sheetHead(`Étage ${i + 1} · vide`, 'Choisissez un type de magasin : le magasin exact est tiré au sort parmi ce type (plus ou moins rare).') +
         `<div class="grid">${CATEGORY_IDS.map((c) => button({ act: 'openShop', args: [i, c], label: `${CATEGORIES[c].emoji} ${CATEGORIES[c].name}`, sub: CATEGORIES[c].products.join(', '), tuto: 'open' })).join('')}</div>` +
-        (s.plans.length ? `<h3>Plans de fusion</h3><p class="sub">Installez directement un magasin obtenu au laboratoire.</p><div class="grid">${s.plans.map((id, k) => button({ act: 'placePlan', args: [k, i], label: `${SHOP_BY_ID[id].emoji} ${esc(SHOP_BY_ID[id].name)}`, sub: RARITY_INFO[SHOP_BY_ID[id].rarity].name })).join('')}</div>` : '') +
+        (s.plans.length ? `<h3>📜 Vos plans</h3><p class="sub">Installez directement un magasin gagné (boîte, laboratoire, saison).</p><div class="grid">${s.plans.map((id, k) => button({ act: 'placePlan', args: [k, i], label: `${SHOP_BY_ID[id].emoji} ${esc(SHOP_BY_ID[id].name)}`, sub: RARITY_INFO[SHOP_BY_ID[id].rarity].name })).join('')}</div>` : '') +
         guide;
     }
     const def = SHOP_BY_ID[shop.defId];
@@ -860,6 +973,17 @@ export class App {
     const r = RARITY_INFO[def.rarity];
     let html = sheetHead(`${def.emoji} ${esc(def.name)}`, `Étage ${i + 1} · ${CATEGORIES[def.category].name}`) +
       `<div class="chips">${chip(r.name, 'rar" style="--rc:' + r.color)}${chip(`Niv. ${shop.level}/${G.MAX_SHOP_LEVEL}`)}${chip('★'.repeat(shop.stars) || '☆')}${chip(`${rate.toFixed(1)} 🪙/s`)}</div>`;
+    const bet = G.rarityBetView(s, i);
+    if (bet) {
+      const [from, to] = [RARITY_INFO[bet.from], RARITY_INFO[bet.to]];
+      const lower = G.RARITIES[G.RARITIES.indexOf(bet.from) - 1];
+      html += `<h3>🎲 Pari de rareté</h3><div class="card bet"><p class="sub">Magasin neuf : tentez de le changer en magasin <b style="color:${to.color}">${to.name}</b> du même type. À faire avant de commander : ensuite, c’est trop tard.</p>` +
+        `<div class="betline"><span class="rar" style="--rc:${from.color}">${from.name}</span><span>→</span><span class="rar" style="--rc:${to.color}">${to.name}</span></div><div class="btns">` +
+        button({ act: 'bet', args: [i, 'sure'], label: `Mise sûre · ${Math.round(bet.chance * 100)} %`, sub: `${fmt(bet.cost)} 🪙 · perdu = rien ne change`, kind: 'main', why: lack(s.coins, bet.cost, 'pièces 🪙') }) +
+        (bet.riskyChance !== undefined
+          ? button({ act: 'bet', args: [i, 'risquee'], label: `Mise risquée · ${Math.round(bet.riskyChance * 100)} %`, sub: `Gratuite · perdu = ${RARITY_INFO[lower].name}`, kind: 'danger' })
+          : '') + '</div></div>';
+    }
     if (shop.restock) {
       const t = RESTOCK_TIERS[shop.restock.tier];
       html += `<div class="card"><b>📦 ${CATEGORIES[def.category].products[shop.restock.tier]} en livraison</b>${timerBar(shop.restock.endsAt, t.restockSec * 1000, now, 'blue')}` +
@@ -878,10 +1002,104 @@ export class App {
       html += `<h3>⬆️ Améliorer</h3><div class="card" data-key="shop-${i}"><div class="line"><div class="grow"><b>Niveau ${shop.level} → ${shop.level + 1}</b><small>+25 % de ventes : ${rate.toFixed(1)} → ${(rate * 1.25).toFixed(1)} 🪙/s</small></div>` +
         button({ act: 'upgradeShop', args: [i], label: 'Améliorer', sub: `${fmt(up)} 🪙`, kind: 'main', tuto: 'upgrade-shop', why: lack(s.coins, up, 'pièces 🪙') }) + '</div></div>';
     }
+    const stars = s.plans.map((id, k) => [id, k] as const).filter(([id]) => id === shop.defId);
+    if (stars.length) html += button({ act: 'planStar', args: [stars[0][1], i], label: `★ Utiliser un plan comme étoile`, sub: `${stars.length} plan(s) ${def.emoji} · +1 ★`, kind: 'main', wide: true });
     if (!floor.rerollUsed && shop.level === 1 && !shop.restock && shop.stock <= 1e-6) {
       html += button({ act: 'reroll', args: [i, 'miles'], label: '🎲 Changer de magasin', sub: `${G.REROLL_MILES} ✈️ · une seule fois, au niveau 1`, kind: 'ghost', wide: true, why: lack(s.miles, G.REROLL_MILES, 'Miles ✈️') });
     }
     return html + guide;
+  }
+
+  private boxSheet(): string {
+    const s = this.state;
+    const now = this.now;
+    const freeAt = G.freeBoxReadyAt(s);
+    const left = G.PITY_BOXES - s.gamble.pity;
+    let html = sheetHead('🎁 Boîtes de plans', 'Chaque boîte donne un magasin en plan : posez-le sur un étage vide, ou utilisez-le comme étoile ★ sur le même magasin.') +
+      (G.gamblePool(s).some((d) => d.rarity === 'L')
+        ? `<div class="card pity"><div class="line"><span class="dexicon">🍀</span><div class="grow"><b>Légendaire garanti dans ${left} boîte${left > 1 ? 's' : ''}</b>${bar(s.gamble.pity / G.PITY_BOXES)}<small>Le compteur repart à zéro à chaque légendaire.</small></div></div></div>`
+        : `<p class="note">🍀 Aucun légendaire à gagner pour l’instant : découvrez de nouveaux pays (Vols › Pays) pour en ajouter aux boîtes.</p>`);
+    for (const b of G.BOXES) {
+      const cost = G.boxCost(s, b.id);
+      const odds = G.boxOdds(s, b.id).filter((o) => o.chance > 0);
+      html += `<div class="card box" data-key="box-${b.id}"><div class="line"><span class="boxicon">${b.emoji}</span><div class="grow"><b>${esc(b.name)}</b>` +
+        `<div class="odds">${odds.map((o) => `<i style="flex:${o.chance};--rc:${RARITY_INFO[o.rarity].color}"></i>`).join('')}</div>` +
+        `<small class="oddl">${odds.map((o) => `<span style="color:${RARITY_INFO[o.rarity].color}">${RARITY_INFO[o.rarity].name} ${fmtPct(o.chance)}</span>`).join('')}</small></div></div><div class="btns">`;
+      if (b.id === 'bronze') {
+        html += button({ act: 'openBox', args: [b.id, 'ad'], label: '📺 Gratuite', sub: freeAt > now ? `Dans ${dur(freeAt - now)}` : 'Regarder une pub', kind: 'ad', small: true, why: freeAt > now ? `Prochaine caisse gratuite dans ${dur(freeAt - now)}.` : false });
+        if (cost.coins !== undefined) html += button({ act: 'openBox', args: [b.id, 'coins'], label: 'Ouvrir', sub: `${fmt(cost.coins)} 🪙`, small: true, kind: 'main', why: lack(s.coins, cost.coins, 'pièces 🪙') });
+      }
+      if (cost.miles !== undefined) html += button({ act: 'openBox', args: [b.id, 'miles'], label: 'Ouvrir', sub: `${cost.miles} ✈️`, small: true, kind: 'rush', why: lack(s.miles, cost.miles, 'Miles ✈️') });
+      html += '</div></div>';
+    }
+    html += this.plansList();
+    return html + `<p class="note">Probabilités réelles, calculées sur les magasins des pays que vous avez découverts.</p>`;
+  }
+
+  /** Plans waiting to be used, with the fastest way to use each. */
+  private plansList(): string {
+    const s = this.state;
+    if (!s.plans.length) return '';
+    const empty = s.floors.findIndex((f) => f.buildEndsAt === undefined && !f.shop);
+    return section(`📜 Vos plans (${s.plans.length})`) + s.plans.map((id, k) => {
+      const d = SHOP_BY_ID[id];
+      const same = s.floors.findIndex((f) => f.shop?.defId === id);
+      const r = RARITY_INFO[d.rarity];
+      const act = empty >= 0
+        ? button({ act: 'placePlan', args: [k, empty], label: `Poser · étage ${empty + 1}`, small: true, kind: 'main' })
+        : same >= 0
+          ? button({ act: 'planStar', args: [k, same], label: `★ Étoile · étage ${same + 1}`, small: true, kind: 'main' })
+          : chip('Construisez un étage');
+      return `<div class="card"><div class="line"><span class="dexicon">${d.emoji}</span><div class="grow"><b>${esc(d.name)}</b><small style="color:${r.color}">${r.name} · ${CATEGORIES[d.category].name}</small></div>${act}</div></div>`;
+    }).join('');
+  }
+
+  private boxResult(boxId: G.BoxId, r: { defId: string; rarity: G.Rarity; duplicate: boolean; pity: boolean }): string {
+    const s = this.state;
+    const d = SHOP_BY_ID[r.defId];
+    const rar = RARITY_INFO[r.rarity];
+    const box = G.BOX_BY_ID[boxId];
+    const cost = G.boxCost(s, boxId);
+    const empty = s.floors.findIndex((f) => f.buildEndsAt === undefined && !f.shop);
+    const same = s.floors.findIndex((f) => f.shop?.defId === r.defId);
+    const k = s.plans.lastIndexOf(r.defId);
+    const again = cost.miles !== undefined && boxId !== 'bronze'
+      ? button({ act: 'openBox', args: [boxId, 'miles'], label: `Rouvrir ${box.emoji}`, sub: `${cost.miles} ✈️`, kind: 'rush', why: lack(s.miles, cost.miles, 'Miles ✈️') })
+      : cost.coins !== undefined
+        ? button({ act: 'openBox', args: [boxId, 'coins'], label: `Rouvrir ${box.emoji}`, sub: `${fmt(cost.coins)} 🪙`, why: lack(s.coins, cost.coins, 'pièces 🪙') })
+        : '';
+    const use = k < 0 ? '' : empty >= 0
+      ? button({ act: 'placePlan', args: [k, empty], label: `Poser à l’étage ${empty + 1}`, kind: 'main' })
+      : same >= 0
+        ? button({ act: 'planStar', args: [k, same], label: `★ Étoile sur l’étage ${same + 1}`, kind: 'main' })
+        : '';
+    return sheetHead(`${box.emoji} ${esc(box.name)}`) + `<div class="reveal r${r.rarity}" style="--rc:${rar.color}"><div class="rbox">${box.emoji}</div><div class="rshop">${d.emoji}</div>` +
+      `<small class="rar" style="--rc:${rar.color}">${rar.name}${r.pity ? ' · garanti 🍀' : ''}</small><h2>${esc(d.name)}</h2>` +
+      `<p>${r.duplicate ? 'Déjà dans votre Dex : utilisez ce plan comme étoile ★ sur le même magasin.' : '✨ Nouveau dans votre Dex !'}</p></div>` +
+      `<div class="btns">${use}${again}</div>` + button({ act: 'boxes', label: 'Retour aux boîtes', kind: 'ghost', wide: true });
+  }
+
+  private dexSheet(): string {
+    const s = this.state;
+    const dex = G.dexView(s);
+    const cur = dex.find((d) => d.id === this.dexTab) ?? dex[0];
+    let html = sheetHead('📖 Dex', 'Tout ce que vous avez trouvé. Les « ? » restent à découvrir : l’indice dit où chercher.') +
+      `<div class="seg dextabs">${dex.map((d) => {
+        const ready = d.milestones.some((m) => m.reached && !m.claimed);
+        return `<button class="${d.id === cur.id ? 'on' : ''}" data-act="dex" data-args='["${d.id}"]'>${d.emoji}<small>${d.found}/${d.total}</small>${ready ? '<i class="dot"></i>' : ''}</button>`;
+      }).join('')}</div>`;
+    html += `<div class="card"><b>${cur.emoji} ${esc(cur.name)} · ${cur.found}/${cur.total}</b>${bar(cur.found / cur.total)}<div class="miles4">` +
+      cur.milestones.map((m, k) => m.claimed
+        ? chip(`✔ ${m.pct} %`, 'ok')
+        : button({ act: 'dexClaim', args: [cur.id, k], label: `${m.pct} %`, sub: `${m.miles} ✈️`, small: true, kind: m.reached ? 'main' : undefined, why: m.reached ? false : `Trouvez ${Math.ceil((m.pct / 100) * cur.total)} entrées sur ${cur.total}.` }),
+      ).join('') + '</div></div>';
+    html += `<div class="dexgrid">${cur.entries.map((e) => {
+      const color = e.rarity ? RARITY_INFO[e.rarity].color : '';
+      return e.seen
+        ? `<div class="dexe" style="${color ? `--rc:${color}` : ''}"><span class="de">${e.emoji}</span><b>${esc(e.name)}</b>${e.count ? `<i class="dc">×${e.count}</i>` : ''}</div>`
+        : `<div class="dexe unseen"><span class="de">?</span><b>???</b>${e.hint ? `<small>${esc(e.hint)}</small>` : ''}</div>`;
+    }).join('')}</div>`;
+    return html;
   }
 
   private vipSheet(uid: string): string {
@@ -942,12 +1160,33 @@ export class App {
         button({ act: 'shop', label: 'Voir les avions', kind: 'main', wide: true, why: full ? `Hangar plein (${s.planes.length}/${G.hangarSize(s.level)}). Il s’agrandit tous les 3 niveaux.` : false }) +
         `</div></section>`,
     );
-    const jump = s.planes.map((p) => {
-      const st = p.flight ? (p.flight.endsAt <= now ? '✅' : '🛫') : p.damaged ? '⚠️' : '🅿️';
-      return `<button class="small" data-act="jumpPlane" data-args='["${p.uid}"]'>${st} ${esc(p.name)}</button>`;
+    // Departure board: every plane at a glance, touch a row to open its card.
+    const rows = s.planes.map((p) => {
+      let state: string;
+      let route: string;
+      if (p.flight) {
+        const c = COUNTRY_BY_ID[p.flight.destination.countryId];
+        const back = p.flight.endsAt <= now;
+        const k = back ? 1 : (now - p.flight.departAt) / (p.flight.endsAt - p.flight.departAt);
+        state = back ? '<span class="st ok">Rentré</span>' : `<span class="st fly">${dur(p.flight.endsAt - now)}</span>`;
+        route = this.route(k, c.emoji, esc(p.flight.destination.name), back);
+      } else if (p.damaged) {
+        state = `<span class="st warn">${p.repairEndsAt ? `🔧 ${dur(p.repairEndsAt - now)}` : 'En panne'}</span>`;
+        route = '<small>Au hangar</small>';
+      } else {
+        state = '<span class="st idle">Au sol</span>';
+        route = '<small>Prêt à embarquer</small>';
+      }
+      return `<button class="brow" data-act="jumpPlane" data-args='["${p.uid}"]'><b style="--pc:${p.color}">${esc(p.name)}</b><div class="grow">${route}</div>${state}</button>`;
     }).join('');
-    const lounge = `<div class="lounge-strip"><span>👥 <b>${Math.floor(s.lounge.passengers)}</b> en attente · ⇅ glissez pour changer d’avion</span><button class="info" data-act="help" data-args='["fleet"]'>ⓘ</button></div>`;
-    return lounge + `<div class="jump">${jump}</div><div class="fleet">${pages.join('')}</div>`;
+    const board = `<div class="board"><div class="bhead"><b>🛫 Départs et arrivées</b><span>👥 ${Math.floor(s.lounge.passengers)} en attente <button class="info" data-act="help" data-args='["fleet"]'>ⓘ</button></span></div>${rows}</div>`;
+    return board + `<div class="fleet">${pages.join('')}</div>`;
+  }
+
+  /** Little route line from the airport to a country with the plane on it. */
+  private route(k: number, flag: string, dest: string, back = false): string {
+    const pct = Math.max(0, Math.min(1, k)) * 100;
+    return `<div class="route"><span>🏢</span><div class="track"><i class="${back ? 'back' : ''}" style="left:${pct.toFixed(1)}%">✈️</i></div><span>${flag}</span></div><small class="rdest">${dest}</small>`;
   }
 
   private planePage(p: PlaneState, k: number, now: number): string {
@@ -968,7 +1207,7 @@ export class App {
         status = `<b class="ok">✅ Rentré de ${c.emoji} ${esc(dest.name)}</b><small>${p.flight.passengers} passagers à bord</small>`;
         actions = button({ act: 'collect', args: [p.uid], label: '📥 Récupérer les gains', kind: 'main', wide: true, tuto: 'collect' });
       } else {
-        status = `<b>🛫 En vol vers ${c.emoji} ${esc(dest.name)}</b><small>Retour dans ${dur(p.flight.endsAt - now)} · ${p.flight.passengers} passagers</small>${timerBar(p.flight.endsAt, p.flight.endsAt - p.flight.departAt, now, 'blue')}`;
+        status = `<b>🛫 En vol vers ${c.emoji} ${esc(dest.name)}</b>${this.route((now - p.flight.departAt) / (p.flight.endsAt - p.flight.departAt), c.emoji, `Retour dans ${dur(p.flight.endsAt - now)} · ${p.flight.passengers} passagers`)}`;
         actions = `<div class="btns">${p.flight.tailwindUsed ? '' : button({ act: 'tailwind', args: [p.uid], label: '📺 Vent arrière', sub: 'Pub', kind: 'ad', small: true })}${this.rushBtn({ kind: 'flight', planeUid: p.uid }, now, 'rush-flight')}</div>`;
       }
     } else if (p.damaged) {
@@ -1254,6 +1493,13 @@ export class App {
         `<div class="card${mission.done ? ' hint' : ''}"><div class="line"><div class="grow"><b>${esc(mission.def.text)}</b>${bar(mission.progress / mission.def.goal)}<small>${mission.progress}/${mission.def.goal} · 🎁 ${mission.def.miles} ✈️${mission.def.coins ? ` + ${mission.def.coins} 🪙` : ''}</small></div>` +
         button({ act: 'mission', label: 'Récupérer', kind: 'main', small: true, tuto: 'mission', why: mission.done ? false : 'Mission pas encore accomplie.' }) + '</div></div>';
     }
+    if (unlocked(s).has('dex')) {
+      const dex = G.dexView(s);
+      const found = dex.reduce((n, d) => n + d.found, 0);
+      const total = dex.reduce((n, d) => n + d.total, 0);
+      const ready = G.dexClaimable(s);
+      html += `<div class="card dexcard${ready ? ' hint' : ''}" data-act="dex" data-args="[null]" role="button"><span class="dexicon">📖</span><span class="grow"><b>Dex · ${found}/${total} trouvés</b>${bar(found / total)}<small>${ready ? `🎁 ${ready} récompense(s) à récupérer` : dex.map((d) => `${d.emoji} ${d.found}/${d.total}`).join(' · ')}</small></span><span class="go">▸</span></div>`;
+    }
     const daily = G.dailyStatus(s, now);
     html += section('🎁 Cadeau du jour', 'daily') + '<div class="card"><div class="days">' +
       DAILY_REWARDS.map((r, k) => {
@@ -1301,6 +1547,11 @@ export class App {
     }
     return html;
   }
+}
+
+function fmtPct(p: number): string {
+  const v = p * 100;
+  return `${v < 10 && v % 1 ? v.toFixed(1).replace('.', ',') : Math.round(v)} %`;
 }
 
 function dailyIcon(r: (typeof DAILY_REWARDS)[number]): string {

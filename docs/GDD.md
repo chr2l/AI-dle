@@ -559,8 +559,10 @@ Serveur réel et authentification, lien de partage du code, écran de visite 3D,
 Interface DOM (`src/ui`) au-dessus de la vue cube art, pensée pour le portrait mobile.
 
 - **Boutons** : verbe + coût ou gain sur deux lignes. Un bouton indisponible reste touchable et explique pourquoi (« Il manque 120 🪙 », « Niveau 6 requis »). Couleurs : jaune = action principale, violet = pub récompensée, turquoise = payé en Miles, gris = secondaire.
-- **Tour** : journal de mission posé sur la vue de l'aéroport (mission, conseil, quêtes du jour). Le hall montre la salle d'embarquement et les VIP présents. Les étages forment un tableau de bord sans boutons : ❗ = action attendue, ⬆ vert = amélioration abordable ; toucher un étage ouvre ses options.
-- **Vols** : sous-vues Avions / Pays / Recherche. Une fiche par avion, en défilement vertical : aperçu cube art, statut et action, caractéristiques avec jauges d'amélioration, 3 sièges d'équipage et emplacements d'équipement modifiables, nom modifiable.
+- **Tour** : la vue de l'aéroport occupe presque tout l'écran. Un **ascenseur** à droite (🛎️ hall, étages, 🏙️ vue d'ensemble) ou un glissement vertical sur la vue fait passer d'un étage à l'autre : les étages du dessus et le toit sont masqués et la caméra zoome sur l'étage choisi. Une **bulle** dans la vue dit ce qu'il attend (❗ Commander, ⬆ Améliorable, VIP au hall, caisse gratuite) ; le petit panneau du bas reprend ses actions directes (réappro, améliorer, guider, pari, « ⋯ » pour la fiche complète). Pastilles de l'ascenseur : ❗ action attendue, vert = amélioration abordable, violet = VIP ou cadeau. Le journal de mission se replie en pastille (« 📋 x/y »), replié d'office après les 4 premières missions.
+- **Boîtes et pari** (§22) : bouton 🎁 Boîtes dans la vue d'ensemble, probabilités en barre colorée, compteur de pitié, écran d'ouverture animé (confettis dès le Rare), plans en attente avec le bouton pour les poser ou en faire une étoile. Le pari de rareté apparaît en tête de la fiche d'un magasin neuf (mise sûre / mise risquée, chances affichées).
+- **Dex** (§23) : carte en tête d'Objectifs, puis fiche par section (magasins, VIP, avions, pays, événements), entrées non trouvées en « ? » avec leur indice, paliers 25/50/75/100 % à récupérer (pastille sur l'onglet).
+- **Vols** : sous-vues Avions / Pays / Recherche. En tête, un **tableau des départs** (une ligne par avion : statut, route et position de l'avion en vol ; toucher une ligne amène sur sa fiche). Une fiche par avion, en défilement vertical : aperçu cube art, statut et action, caractéristiques avec jauges d'amélioration, 3 sièges d'équipage et emplacements d'équipement modifiables, nom modifiable.
 - **Tutoriel** : le conseil suit la mission en cours (§11) ; le bouton à toucher clignote, ou l'onglet à ouvrir s'il est ailleurs. Écran de bienvenue au premier lancement, aide ⓘ sur chaque section et sur les compteurs du HUD.
 - **Déblocage progressif** (annoncé par un écran « Nouveau ! ») :
 
@@ -571,6 +573,7 @@ Interface DOM (`src/ui`) au-dessus de la vue cube art, pensée pour le portrait 
 | Équipe | 7 (Recruter) | 3 |
 | Recherche | 11 (Terminer une recherche) | 3 |
 | Événements saisonniers, Amis, Laboratoire | — | 2, 3, 3 |
+| Boîtes de plans, Dex | — | 2 |
 | Franchise (aperçu, active au niveau 12) | — | 10 |
 
 - **Retours** : pièces et Miles qui volent vers le compteur, confettis (mission, niveau, déblocage), sons synthétisés (coupables dans le HUD), vibrations légères (Capacitor Haptics), glissement horizontal pour changer d'onglet, pastilles de notification sur les onglets.
