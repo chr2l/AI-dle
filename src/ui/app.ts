@@ -20,11 +20,15 @@ import '@fontsource/nunito/latin-700.css';
 import '@fontsource/nunito/latin-800.css';
 import '@fontsource/lilita-one/latin-400.css';
 import './style.css';
-import { RUNWAY_STOP, TowerView } from './towerView';
+import './comfort.css';
+import { App as NativeApp } from '@capacitor/app';
+import { RUNWAY_STOP, TowerView, setTowerFps } from './towerView';
 import { iconize } from './icons';
-import { confetti, flyTo, haptic, isMuted, sound, toggleMute } from './fx';
+import { replaceGame, saveGame } from './persist';
+import { applySettings, onSettings, reducedMotion, setSetting, settings, type Settings } from './settings';
+import { confetti, flyTo, haptic, sound } from './fx';
 import { FEATURES, guideStep, isTabOpen, tabBadges, unlocked, type Feature, type Tab } from './tutorial';
-import { bar, button, chip, dur, esc, fmt, lack, morph, pips, section, sheetHead, timerBar } from './widgets';
+import { bar, button, chip, dec, dur, esc, fmt, lack, morph, perSec, pips, section, sheetHead, timerBar } from './widgets';
 
 export { dur, fmt } from './widgets';
 
@@ -70,9 +74,9 @@ const storage = {
 };
 
 const ROLE_BONUS: Record<CrewRole, (pts: number) => string> = {
-  pilot: (p) => `+${(100 * G.PILOT_SPEED_PER_POINT * p).toFixed(1)} % vitesse`,
+  pilot: (p) => `+${dec(100 * G.PILOT_SPEED_PER_POINT * p)} % vitesse`,
   cabin: (p) => `+${Math.floor(G.CABIN_COMFORT_PER_POINT * p)} confort`,
-  mechanic: (p) => `+${(G.MECHANIC_RELIABILITY_PER_POINT * p).toFixed(1)} fiabilité`,
+  mechanic: (p) => `+${dec(G.MECHANIC_RELIABILITY_PER_POINT * p)} fiabilité`,
 };
 
 function techEffect(t: TechDef): string {
@@ -107,6 +111,8 @@ export class App {
   private pointer = { x: innerWidth / 2, y: innerHeight / 2 };
   private flash: { key: string; until: number } | null = null;
   private lastCoins = 0;
+  /** Coins shown in the HUD: rolls towards the real amount every frame. */
+  private shownCoins = 0;
   private lastLevel = 0;
   /** Stop shown in the Tour view: 0 = hall, 1..n = floors, beyond = whole tower. */
   private stopAt = Infinity;
@@ -145,6 +151,11 @@ export class App {
     addEventListener('pointercancel', () => (this.pointerDown = false));
     this.swipeTabs();
     this.lastCoins = state.coins;
+    this.shownCoins = state.coins;
+    onSettings((st) => {
+      applySettings();
+      setTowerFps(st.fps);
+    });
     this.lastLevel = state.level;
     // Open during the first steps, folded afterwards unless the player chose.
     const j = storage.get(JOURNAL_KEY);
@@ -214,19 +225,52 @@ export class App {
     }
     void this.social.publish(G.publicProfile(this.state, Date.now()));
     const frame = () => {
-      G.update(this.state, Date.now());
+      const tick = G.update(this.state, Date.now());
+      // Back from the background (frames stop while hidden): show what happened.
+      if (tick.seconds >= 60 && !this.sheetLocked) {
+        saveGame(this.state);
+        this.showOffline(tick);
+      }
+      this.rollCoins();
       requestAnimationFrame(frame);
     };
     requestAnimationFrame(frame);
     setInterval(() => {
       if (!this.pointerDown) this.render();
     }, 1000);
-    setInterval(() => G.save(this.state), 10_000);
-    window.addEventListener('pagehide', () => G.save(this.state));
+    setInterval(() => saveGame(this.state), 10_000);
+    window.addEventListener('pagehide', () => saveGame(this.state));
     document.addEventListener('visibilitychange', () => {
-      if (document.hidden) G.save(this.state);
+      if (document.hidden) saveGame(this.state);
     });
+    void NativeApp.addListener('backButton', () => this.back()).catch(() => {});
     if (!storage.get(WELCOME_KEY) && !this.sheet) this.openHelp('welcome');
+  }
+
+  /** Android back: closes the sheet, else returns to the Tour tab, else offers to quit. */
+  private back() {
+    if (this.sheet) {
+      if (!this.sheetLocked) this.closeSheet();
+    } else if (this.tab !== 'tour') {
+      this.goTab('tour');
+    } else {
+      this.sheet = () =>
+        sheetHead('Quitter IdlePort ?', 'Vos magasins continuent de vendre pendant votre absence.') +
+        button({ act: 'quit', label: 'Quitter', kind: 'main', wide: true }) +
+        button({ act: 'close', label: 'Rester', kind: 'ghost', wide: true });
+    }
+    this.render();
+  }
+
+  /** HUD coin counter: follows the real amount, easing over big gains. */
+  private rollCoins() {
+    const target = this.state.coins;
+    const gap = target - this.shownCoins;
+    if (gap <= 0 || reducedMotion() || gap < G.totalShopRate(this.state) * 2) this.shownCoins = target;
+    else this.shownCoins += Math.max(gap * 0.12, 1);
+    const el = this.root.querySelector('#hud [data-res="coins"] .rv');
+    const text = fmt(this.shownCoins, true);
+    if (el && el.textContent !== text) el.textContent = text;
   }
 
   private get now() {
@@ -329,8 +373,53 @@ export class App {
         if (a[1]) this.volsView = a[1];
         if (this.sheet && !this.sheetLocked) this.closeSheet();
         break;
-      case 'mute':
-        this.toast(toggleMute() ? 'Son coupé 🔇' : 'Son activé 🔊');
+      case 'settings':
+        this.sheet = () => this.settingsSheet();
+        break;
+      case 'set':
+        setSetting(a[0] as keyof Settings, a[1] as never);
+        break;
+      case 'quit':
+        saveGame(s);
+        void NativeApp.exitApp().catch(() => this.closeSheet());
+        break;
+      case 'exportSave':
+        void this.exportSave();
+        break;
+      case 'copySave': {
+        const area = this.root.querySelector<HTMLTextAreaElement>('#savecode');
+        if (!area) break;
+        navigator.clipboard?.writeText(area.value).then(
+          () => this.toast('Code copié ✅', 'ok'),
+          () => {
+            area.select();
+            this.toast('Sélectionné : copiez-le avec un appui long');
+          },
+        ) ?? area.select();
+        break;
+      }
+      case 'importSave':
+        this.sheet = () =>
+          sheetHead('Charger une partie', 'Collez un code de sauvegarde IdlePort.') +
+          `<textarea id="savecode" rows="5" autocomplete="off" spellcheck="false" placeholder="IDLEPORT1.…"></textarea>` +
+          button({ act: 'importCheck', label: 'Vérifier le code', kind: 'main', wide: true }) +
+          button({ act: 'settings', label: 'Retour', kind: 'ghost', wide: true });
+        break;
+      case 'importCheck':
+        void this.importSave();
+        break;
+      case 'importDo':
+        if (this.pendingImport) void replaceGame(this.pendingImport);
+        break;
+      case 'resetAsk':
+        this.sheet = () =>
+          sheetHead('Recommencer de zéro ?', 'Toute la partie sera effacée : étages, avions, équipage, Miles, collections. Ce n’est pas une Franchise.') +
+          `<p class="note">Pensez à exporter votre code de sauvegarde avant, au cas où.</p>` +
+          button({ act: 'reset', label: 'Tout effacer', kind: 'danger', wide: true }) +
+          button({ act: 'settings', label: 'Annuler', kind: 'ghost', wide: true });
+        break;
+      case 'reset':
+        void replaceGame(null, [WELCOME_KEY, UNLOCKED_KEY, JOURNAL_KEY]);
         break;
       case 'vols':
         this.volsView = a[0];
@@ -680,7 +769,58 @@ export class App {
         break;
       }
     }
-    G.save(this.state);
+    saveGame(this.state);
+    this.render();
+  }
+
+  private settingsSheet(): string {
+    const st = settings;
+    const row = (title: string, sub: string, key: keyof Settings, options: [Settings[keyof Settings], string][]) =>
+      `<div class="set-row"><div><b>${title}</b><small>${sub}</small></div><div class="seg">` +
+      options.map(([v, label]) => `<button class="${st[key] === v ? 'on' : ''}" data-act="set" data-args='${esc(JSON.stringify([key, v]))}' aria-pressed="${st[key] === v}">${label}</button>`).join('') +
+      `</div></div>`;
+    return (
+      sheetHead('⚙ Réglages') +
+      `<h3>Confort</h3>` +
+      row('Sons', 'Effets sonores des boutons et des gains.', 'sound', [[true, 'Activés'], [false, 'Coupés']]) +
+      row('Vibrations', 'Petites vibrations au toucher et aux récompenses.', 'haptics', [[true, 'Activées'], [false, 'Coupées']]) +
+      row('Animations', 'Pièces volantes, confettis, transitions. « Auto » suit le réglage du téléphone.', 'motion', [['auto', 'Auto'], ['full', 'Toutes'], ['reduced', 'Réduites']]) +
+      row('Taille du texte', 'Agrandit les panneaux et les fenêtres.', 'text', [['normal', 'Normale'], ['large', 'Grande']]) +
+      row('Fluidité de la vue', '60 images par seconde : plus doux, use plus la batterie.', 'fps', [[30, '30 i/s'], [60, '60 i/s']]) +
+      `<h3>Sauvegarde</h3>` +
+      `<p class="sub">La partie est enregistrée sur le téléphone toutes les 10 secondes, avec une copie de secours. Le code de sauvegarde permet de la garder ailleurs ou de la passer sur un autre téléphone.</p>` +
+      `<div class="btns">${button({ act: 'exportSave', label: '📤 Exporter', sub: 'Code à copier' })}${button({ act: 'importSave', label: '📥 Charger', sub: 'Coller un code' })}</div>` +
+      `<h3>Aide</h3>` +
+      `<div class="btns">${button({ act: 'help', args: ['welcome'], label: '❓ Comment jouer' })}${button({ act: 'help', args: ['privacy'], label: '🔒 Confidentialité' })}</div>` +
+      `<h3>Zone sensible</h3>` +
+      button({ act: 'resetAsk', label: 'Recommencer de zéro', sub: 'Efface toute la partie', kind: 'ghost', wide: true }) +
+      `<p class="sub center">IdlePort ${__APP_VERSION__}</p>`
+    );
+  }
+
+  private pendingImport: GameState | null = null;
+
+  private async exportSave() {
+    const code = await G.exportCode(this.state);
+    this.sheet = () =>
+      sheetHead('📤 Code de sauvegarde', 'Gardez-le dans vos notes ou envoyez-le-vous par message.') +
+      `<textarea id="savecode" rows="5" readonly>${esc(code)}</textarea>` +
+      button({ act: 'copySave', label: 'Copier le code', kind: 'main', wide: true }) +
+      button({ act: 'settings', label: 'Retour', kind: 'ghost', wide: true });
+    this.render();
+  }
+
+  private async importSave() {
+    const code = this.root.querySelector<HTMLTextAreaElement>('#savecode')?.value ?? '';
+    const game = await G.importCode(code, Date.now());
+    if (!game) return this.toast('Ce code n’est pas valide : vérifiez qu’il est complet.', 'err');
+    this.pendingImport = game;
+    this.sheet = () =>
+      sheetHead('Remplacer votre partie ?', 'La partie du code remplacera celle de ce téléphone.') +
+      `<div class="card"><b>Partie du code</b><small>⭐ Niveau ${game.level} · ${game.floors.length} étages · ${game.planes.length} avion(s) · ${fmt(game.coins)} 🪙 · ${game.miles} ✈️</small></div>` +
+      `<div class="card"><b>Partie actuelle</b><small>⭐ Niveau ${this.state.level} · ${this.state.floors.length} étages · ${this.state.planes.length} avion(s) · ${fmt(this.state.coins)} 🪙 · ${this.state.miles} ✈️</small></div>` +
+      button({ act: 'importDo', label: 'Charger cette partie', kind: 'danger', wide: true }) +
+      button({ act: 'settings', label: 'Annuler', kind: 'ghost', wide: true });
     this.render();
   }
 
@@ -809,10 +949,10 @@ export class App {
       `<button class="res ${cls}" data-act="help" data-args='["${key}"]' data-res="${key}"><span class="ri">${icon}</span><span class="rv">${value}</span><span class="rl">${label}</span></button>`;
     morph(this.root.querySelector('#hud')!,
       `<div class="res-row">` +
-      res('coins', '🪙', fmt(s.coins), `+${G.totalShopRate(s).toFixed(1)}/s`, gained ? 'gain' : '') +
+      res('coins', '🪙', fmt(this.shownCoins, true), `+${perSec(G.totalShopRate(s))}/s`, gained ? 'gain' : '') +
       res('miles', '✈️', String(s.miles), 'Miles') +
       res('lounge', '👥', `${Math.floor(s.lounge.passengers)}/${G.loungeCap(s)}`, 'Passagers') +
-      `<div class="hud-btns"><button class="help-btn" data-act="help" data-args='["welcome"]' aria-label="Comment jouer">?</button><button class="help-btn" data-act="mute" aria-label="Son">${isMuted() ? '🔇' : '🔊'}</button></div></div>` +
+      `<button class="gear" data-act="settings" aria-label="Réglages">⚙</button></div>` +
       `<button class="lvl" data-act="help" data-args='["level"]'><b>⭐ Niv. ${s.level}</b>${bar(s.xp / xpNeed, 'xp')}<small>${fmt(s.xp)}/${fmt(xpNeed)} XP</small></button>`);
   }
 
@@ -864,7 +1004,7 @@ export class App {
     }
     if (shop.stock > 1e-6) {
       const up = shop.level < G.MAX_SHOP_LEVEL ? G.shopUpgradeCost(def.rarity, shop.level) : Infinity;
-      return { icon: shopPic(def.id), name, sub: `${rate.toFixed(1)} 🪙/s · stock pour ${dur((shop.stock / rate) * 1000)}`, mark: s.coins >= up ? 'can' : '', tuto: 'upgrade-shop', color, bar: '' };
+      return { icon: shopPic(def.id), name, sub: `${perSec(rate)} 🪙/s · stock pour ${dur((shop.stock / rate) * 1000)}`, mark: s.coins >= up ? 'can' : '', tuto: 'upgrade-shop', color, bar: '' };
     }
     return { icon: shopPic(def.id), name, sub: '<span class="warn">Rayons vides !</span>', mark: 'need', tuto: 'restock', color, bar: '' };
   }
@@ -947,7 +1087,7 @@ export class App {
       const building = s.floors.some((f) => f.buildEndsAt !== undefined);
       const max = G.maxFloors(s.level);
       const open = unlocked(s);
-      let html = nav(`🏙️ Votre tour · ${n}/${max} étages`, `${G.totalShopRate(s).toFixed(1)} 🪙/s · glissez la vue ou ▼ pour visiter les étages`) + '<div class="dock-body"><div class="btns">';
+      let html = nav(`🏙️ Votre tour · ${n}/${max} étages`, `${perSec(G.totalShopRate(s))} 🪙/s · glissez la vue ou ▼ pour visiter les étages`) + '<div class="dock-body"><div class="btns">';
       html += next <= max
         ? button({ act: 'build', label: `➕ Construire l’étage ${next}`, sub: `${fmt(G.buildCost(next))} 🪙 · ${dur(G.buildDuration(next) * 1000)}`, kind: 'main', tuto: 'build', why: building ? 'Un chantier est déjà en cours.' : lack(s.coins, G.buildCost(next), 'pièces 🪙') })
         : chip(`Tour complète pour le niveau ${s.level}`);
@@ -1011,7 +1151,7 @@ export class App {
     const rate = G.shopRate(s, i);
     const r = RARITY_INFO[def.rarity];
     let html = sheetHead(`${shopPic(def.id, 'lg')} ${esc(def.name)}`, `Étage ${i + 1} · ${CATEGORIES[def.category].name}`) +
-      `<div class="chips">${chip(r.name, 'rar" style="--rc:' + r.color)}${chip(`Niv. ${shop.level}/${G.MAX_SHOP_LEVEL}`)}${chip('★'.repeat(shop.stars) || '☆')}${chip(`${rate.toFixed(1)} 🪙/s`)}</div>`;
+      `<div class="chips">${chip(r.name, 'rar" style="--rc:' + r.color)}${chip(`Niv. ${shop.level}/${G.MAX_SHOP_LEVEL}`)}${chip('★'.repeat(shop.stars) || '☆')}${chip(`${perSec(rate)} 🪙/s`)}</div>`;
     const bet = G.rarityBetView(s, i);
     if (bet) {
       const [from, to] = [RARITY_INFO[bet.from], RARITY_INFO[bet.to]];
@@ -1038,7 +1178,7 @@ export class App {
     }
     if (shop.level < G.MAX_SHOP_LEVEL) {
       const up = G.shopUpgradeCost(def.rarity, shop.level);
-      html += `<h3>⬆️ Améliorer</h3><div class="card" data-key="shop-${i}"><div class="line"><div class="grow"><b>Niveau ${shop.level} → ${shop.level + 1}</b><small>+25 % de ventes : ${rate.toFixed(1)} → ${(rate * 1.25).toFixed(1)} 🪙/s</small></div>` +
+      html += `<h3>⬆️ Améliorer</h3><div class="card" data-key="shop-${i}"><div class="line"><div class="grow"><b>Niveau ${shop.level} → ${shop.level + 1}</b><small>+25 % de ventes : ${perSec(rate)} → ${perSec(rate * 1.25)} 🪙/s</small></div>` +
         button({ act: 'upgradeShop', args: [i], label: 'Améliorer', sub: `${fmt(up)} 🪙`, kind: 'main', tuto: 'upgrade-shop', why: lack(s.coins, up, 'pièces 🪙') }) + '</div></div>';
     }
     const stars = s.plans.map((id, k) => [id, k] as const).filter(([id]) => id === shop.defId);
@@ -1287,7 +1427,7 @@ export class App {
     const stats = STAT_KEYS.map((key, idx) => {
       const lvl = p.upgrades[key];
       const cost = G.planeUpgradeCost(model.price, lvl);
-      const value = st[key].toFixed(key === 'comfort' ? 1 : 0);
+      const value = key === 'comfort' ? dec(st[key]) : st[key].toFixed(0);
       return `<div class="stat" data-key="stat-${p.uid}-${key}"><span class="sicon">${STAT_INFO[key].emoji}</span><div class="grow"><b>${STAT_INFO[key].name}</b> <span class="sval">${value} ${STAT_INFO[key].unit}</span>${pips(lvl, MAX_STAT_LEVEL)}</div>` +
         (lvl < MAX_STAT_LEVEL
           ? button({ act: 'upgradePlane', args: [p.uid, key], label: '⬆️', sub: `${fmt(cost)} 🪙`, small: true, tuto: idx === 0 && k === 0 ? 'upgrade-plane' : undefined, why: lack(s.coins, cost, 'pièces 🪙') })
@@ -1371,7 +1511,7 @@ export class App {
   private vipMiss(p: PlaneState, v: GameState['vips'][number]): string {
     const st = G.planeStats(this.state, p);
     if (!v.demand) return '';
-    if (st.comfort < v.demand.minComfort) return `confort ${st.comfort.toFixed(1)}/${v.demand.minComfort} 🛋️ insuffisant`;
+    if (st.comfort < v.demand.minComfort) return `confort ${dec(st.comfort)}/${v.demand.minComfort} 🛋️ insuffisant`;
     if (v.demand.moduleId && !p.modules.includes(v.demand.moduleId)) return `il manque l’équipement ${MODULE_BY_ID[v.demand.moduleId]?.emoji ?? ''} ${MODULE_BY_ID[v.demand.moduleId]?.name ?? ''}`;
     return '';
   }
@@ -1439,7 +1579,7 @@ export class App {
       const vipNote = vips.length ? `<small class="vipnote">${vips.map((v) => vipPic(v.defId)).join('')} ${vips.length} VIP embarquera s’il part vers ${c.name}</small>` : '';
       return `<div class="country"><div class="chead"><b>${c.emoji} ${c.name}</b>${c.id === featured ? chip('À la une ×1,5', 'gold') : ''}<small>${c.resource.emoji} ${c.resource.name}</small></div>${vipNote}${rows.join('')}</div>`;
     });
-    return sheetHead(`🛫 Où envoyer ${esc(plane.name)} ?`, `${pax} passagers à bord · autonomie ${Math.floor(st.range)} km · confort ${st.comfort.toFixed(1)}`) + groups.join('') +
+    return sheetHead(`🛫 Où envoyer ${esc(plane.name)} ?`, `${pax} passagers à bord · autonomie ${Math.floor(st.range)} km · confort ${dec(st.comfort)}`) + groups.join('') +
       `<p class="sub">Nouvelles destinations dans ${dur(G.msUntilNewDestinations(now))}. Les gains affichés sont estimés.</p>`;
   }
 
@@ -1583,7 +1723,7 @@ export class App {
     const [profile] = await this.social.fetchProfiles([G.normalizeCode(code)]);
     if (!profile) this.toast('Joueur introuvable : le serveur social n’est pas encore en ligne.', 'err');
     else this.check(G.addFriend(this.state, profile, Date.now()), `${profile.name} ajouté !`);
-    G.save(this.state);
+    saveGame(this.state);
     this.render();
   }
 

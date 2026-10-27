@@ -34,4 +34,5 @@ export const HELP: Record<string, { title: string; body: string[] }> = {
   season: { title: '🎉 Événement saisonnier', body: ['Pendant l’événement, chaque vol rapporte des points ; les vols vers le pays de l’événement en donnent deux fois plus.', 'Récupérez les paliers avant la fin.'] },
   achievements: { title: '🏆 Succès', body: ['Des objectifs à long terme qui rapportent des Miles.'] },
   social: { title: '👋 Amis', body: ['Échangez vos codes ami pour vous envoyer un cadeau par jour et visiter vos aéroports (petit bonus de pièces).', 'Le classement de la semaine compare les pièces gagnées ; le podium rapporte des Miles le lundi.', 'Le serveur social n’est pas encore en ligne : aucun code ne peut être trouvé pour l’instant.'] },
+  privacy: { title: '🔒 Confidentialité', body: ['Votre partie est enregistrée uniquement sur ce téléphone. Aucune donnée personnelle n’est envoyée ni partagée pour l’instant.', 'Les publicités et achats sont simulés : rien n’est facturé.', 'Si cela change (amis en ligne, statistiques anonymes), le jeu vous demandera votre accord avant.'] },
 };

@@ -428,7 +428,7 @@ Revendre l'aéroport pour en ouvrir un dans une nouvelle ville.
 
 ## 16. Technique
 - TypeScript + Vite + Three.js. Logique de jeu pure et testée (`src/core`), rendu (`src/render`), interface (`src/ui`).
-- Sauvegarde locale (`localStorage`, clé `idleport.save`) toutes les 10 s et à la fermeture, versionnée : chaque nouvelle version ajoute une migration, et les champs absents d'une ancienne sauvegarde sont remplis avec les valeurs de départ. Une sauvegarde illisible ou plus récente que le jeu est ignorée.
+- Sauvegarde locale toutes les 10 s, après chaque action et à la fermeture : `localStorage` (clé `idleport.save`) et, sur téléphone, stockage natif (`@capacitor/preferences`), chacun avec une copie de secours (`idleport.save.bak`) ; au lancement, la copie lisible la plus avancée gagne. Code de sauvegarde (Réglages) pour exporter ou charger une partie. La sauvegarde est versionnée : chaque nouvelle version ajoute une migration, et les champs absents d'une ancienne sauvegarde sont remplis avec les valeurs de départ. Une sauvegarde illisible ou plus récente que le jeu est ignorée.
 - Packaging mobile prévu via Capacitor (Android / iOS).
 
 ## 17. Périmètre MVP (v0.1)
@@ -581,6 +581,10 @@ Interface DOM (`src/ui`) au-dessus de la vue cube art, pensée pour le portrait 
 
 - **Retours** : pièces et Miles qui volent vers le compteur, confettis (mission, niveau, déblocage), sons synthétisés (coupables dans le HUD), vibrations légères (Capacitor Haptics), glissement horizontal pour changer d'onglet, pastilles de notification sur les onglets.
 - **Typo** : Nunito (texte) et Lilita One (titres, chiffres), embarquées dans l'APK.
+- **Réglages** (⚙ dans le HUD) : sons, vibrations, animations (auto = réglage du téléphone, ou réduites), taille du texte, 30 ou 60 i/s, export et chargement de la sauvegarde, recommencer de zéro, confidentialité, version.
+- **Android** : le geste retour ferme la fenêtre ouverte, sinon revient à la Tour, sinon propose de quitter. Au retour d'arrière-plan après plus d'une minute, le récapitulatif hors ligne s'affiche.
+- **Chiffres** : à la française (« 9 999 », « 12,4 k », « 3,05 Md », puis Bn, Bd, Tn, Td, aa…) ; le compteur de pièces défile en continu.
+- **Accessibilité** : zones tactiles de 44 px, texte de 12 px minimum, contour de focus visible.
 
 ## 22. Gamble : boîtes de plans et pari de rareté
 

@@ -5,18 +5,38 @@ import { iconize } from './icons';
 
 export const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
 
-export function fmt(n: number): string {
+/** French short scale names: k, M (million), Md (milliard), Bn (billion)… then aa, ab… */
+const UNITS = ['k', 'M', 'Md', 'Bn', 'Bd', 'Tn', 'Td'];
+const unit = (i: number) => (i < UNITS.length ? UNITS[i] : String.fromCharCode(97 + Math.floor((i - UNITS.length) / 26) % 26, 97 + ((i - UNITS.length) % 26)));
+/** Narrow no-break space: French thousands separator and number/unit gap. */
+const NNBSP = '\u202f';
+
+/**
+ * Amount in French: « 9 999 », « 12,4 k », « 3,05 Md ». `precise` keeps
+ * three significant digits (HUD counter, so it visibly rolls).
+ */
+export function fmt(n: number, precise = false): string {
   const v = Math.floor(n);
-  if (v < 10_000) return String(v);
-  const units = ['k', 'M', 'G', 'T'];
+  if (Math.abs(v) < 10_000) return String(v).replace(/\B(?=(\d{3})+(?!\d))/g, NNBSP);
   let x = v;
   let i = -1;
-  while (x >= 1000 && i < units.length - 1) {
+  while (Math.abs(x) >= 1000) {
     x /= 1000;
     i++;
   }
-  return `${x < 100 ? x.toFixed(1) : Math.floor(x)}${units[i]}`;
+  const abs = Math.abs(x);
+  const digits = precise ? (abs < 10 ? 2 : abs < 100 ? 1 : 0) : abs < 100 ? 1 : 0;
+  // Truncate rather than round, so 999,96 k never shows as « 1000,0 k ».
+  const f = 10 ** digits;
+  const shown = (Math.floor(x * f) / f).toFixed(digits).replace('.', ',').replace(/,0+$/, '');
+  return `${shown}${NNBSP}${unit(i)}`;
 }
+
+/** Decimal number in French (« 1,5 »). */
+export const dec = (n: number, digits = 1) => n.toFixed(digits).replace('.', ',');
+
+/** Per-second rate: one decimal while small, then like fmt(). */
+export const perSec = (n: number) => (n < 1000 ? dec(n) : fmt(n));
 
 export function dur(ms: number): string {
   const s = Math.max(0, Math.ceil(ms / 1000));
