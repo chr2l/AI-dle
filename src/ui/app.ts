@@ -25,6 +25,9 @@ import { App as NativeApp } from '@capacitor/app';
 import { RUNWAY_STOP, TowerView, setTowerFps } from './towerView';
 import { iconize } from './icons';
 import { replaceGame, saveGame } from './persist';
+import { NOTIF_KINDS, askPermission, cancelReminders, scheduleReminders } from './notify';
+import { TELEMETRY_URL, flush, problemReport, track, watchErrors } from './telemetry';
+import { Capacitor } from '@capacitor/core';
 import { applySettings, onSettings, reducedMotion, setSetting, settings, type Settings } from './settings';
 import { confetti, flyTo, haptic, sound } from './fx';
 import { FEATURES, guideStep, isTabOpen, tabBadges, unlocked, type Feature, type Tab } from './tutorial';
@@ -114,6 +117,8 @@ export class App {
   /** Coins shown in the HUD: rolls towards the real amount every frame. */
   private shownCoins = 0;
   private lastLevel = 0;
+  private lastMission = 0;
+  private sessionStart = Date.now();
   /** Stop shown in the Tour view: 0 = hall, 1..n = floors, beyond = whole tower. */
   private stopAt = Infinity;
   private journalOpen: boolean;
@@ -157,6 +162,7 @@ export class App {
       setTowerFps(st.fps);
     });
     this.lastLevel = state.level;
+    this.lastMission = state.missionIndex;
     // Open during the first steps, folded afterwards unless the player chose.
     const j = storage.get(JOURNAL_KEY);
     this.journalOpen = j === null ? state.missionIndex < 4 : j === '1';
@@ -241,10 +247,38 @@ export class App {
     setInterval(() => saveGame(this.state), 10_000);
     window.addEventListener('pagehide', () => saveGame(this.state));
     document.addEventListener('visibilitychange', () => {
-      if (document.hidden) saveGame(this.state);
+      if (document.hidden) {
+        saveGame(this.state);
+        void scheduleReminders(this.state);
+        track('session_end', { sec: Math.round((Date.now() - this.sessionStart) / 1000), lvl: this.state.level });
+        void flush();
+      } else {
+        this.sessionStart = Date.now();
+        void cancelReminders();
+        track('session_start', this.summary());
+      }
     });
+    watchErrors(__APP_VERSION__);
+    void cancelReminders();
+    track('session_start', this.summary());
+    void flush();
     void NativeApp.addListener('backButton', () => this.back()).catch(() => {});
-    if (!storage.get(WELCOME_KEY) && !this.sheet) this.openHelp('welcome');
+    if (!storage.get(WELCOME_KEY) && !this.sheet) this.openIntro();
+  }
+
+  /** Game summary attached to statistics events. */
+  private summary() {
+    const s = this.state;
+    return { lvl: s.level, m: s.missionIndex, floors: s.floors.length, planes: s.planes.length, fr: s.prestige.count, v: __APP_VERSION__ };
+  }
+
+  /** First launch: one sentence, then the journal guides (the full rules stay in Réglages). */
+  private openIntro() {
+    track('first_launch');
+    this.sheet = () =>
+      `<div class="unlock"><div class="uicon">✈️</div><small>Bienvenue à</small><h2>IdlePort</h2>` +
+      `<p>Construisez votre aéroport étage par étage, ouvrez des magasins et envoyez vos avions aux quatre coins de la carte. Le journal vous guide pas à pas.</p></div>` +
+      button({ act: 'welcomeDone', label: 'C’est parti !', kind: 'main', wide: true });
   }
 
   /** Android back: closes the sheet, else returns to the Tour tab, else offers to quit. */
@@ -378,6 +412,35 @@ export class App {
         break;
       case 'set':
         setSetting(a[0] as keyof Settings, a[1] as never);
+        if (this.sheetPrompt) {
+          this.sheetPrompt = false;
+          this.closeSheet();
+        }
+        if (a[0] === 'analytics') void flush();
+        if (a[0] === 'notif' && a[1]) void askPermission();
+        break;
+      case 'notifKind':
+        setSetting('notifOff', settings.notifOff.includes(a[0]) ? settings.notifOff.filter((k) => k !== a[0]) : [...settings.notifOff, a[0]]);
+        break;
+      case 'notifYes':
+        this.closeSheet();
+        void askPermission().then((ok) => {
+          setSetting('notif', ok);
+          track('notif_permission', { ok });
+          this.toast(ok ? 'Rappels activés 🔔' : 'Rappels refusés : vous pourrez les activer dans les réglages du téléphone.', ok ? 'ok' : 'info');
+        });
+        break;
+      case 'notifNo':
+        setSetting('notif', false);
+        track('notif_permission', { ok: false, soft: true });
+        this.closeSheet();
+        break;
+      case 'report':
+        this.sheet = () =>
+          sheetHead('🐞 Signaler un problème', 'Copiez ce rapport et envoyez-le avec une phrase qui décrit ce qui s’est passé.') +
+          `<textarea id="savecode" rows="8" readonly>${esc(problemReport(__APP_VERSION__, `Niveau ${s.level} · mission ${s.missionIndex} · ${s.floors.length} étages · ${s.planes.length} avion(s)`))}</textarea>` +
+          button({ act: 'copySave', label: 'Copier le rapport', kind: 'main', wide: true }) +
+          button({ act: 'settings', label: 'Retour', kind: 'ghost', wide: true });
         break;
       case 'quit':
         saveGame(s);
@@ -787,11 +850,16 @@ export class App {
       row('Animations', 'Pièces volantes, confettis, transitions. « Auto » suit le réglage du téléphone.', 'motion', [['auto', 'Auto'], ['full', 'Toutes'], ['reduced', 'Réduites']]) +
       row('Taille du texte', 'Agrandit les panneaux et les fenêtres.', 'text', [['normal', 'Normale'], ['large', 'Grande']]) +
       row('Fluidité de la vue', '60 images par seconde : plus doux, use plus la batterie.', 'fps', [[30, '30 i/s'], [60, '60 i/s']]) +
+      `<h3>Rappels</h3>` +
+      row('Notifications', 'Avion rentré, rayon vide, cadeau du jour… Jamais entre 22 h et 8 h.', 'notif', [[true, 'Activées'], [false, 'Coupées']]) +
+      (st.notif ? `<div class="kinds">${NOTIF_KINDS.map((k) => { const on = !st.notifOff.includes(k.id); return `<button class="${on ? 'on' : ''}" data-act="notifKind" data-args='${esc(JSON.stringify([k.id]))}' aria-pressed="${on}">${on ? '✔ ' : ''}${k.label}</button>`; }).join('')}</div>` : '') +
+      (TELEMETRY_URL ? row('Statistiques anonymes', 'Missions atteintes, durée des sessions, erreurs. Rien de personnel.', 'analytics', [['yes', 'Partager'], ['no', 'Ne pas partager']]) : '') +
       `<h3>Sauvegarde</h3>` +
       `<p class="sub">La partie est enregistrée sur le téléphone toutes les 10 secondes, avec une copie de secours. Le code de sauvegarde permet de la garder ailleurs ou de la passer sur un autre téléphone.</p>` +
       `<div class="btns">${button({ act: 'exportSave', label: '📤 Exporter', sub: 'Code à copier' })}${button({ act: 'importSave', label: '📥 Charger', sub: 'Coller un code' })}</div>` +
       `<h3>Aide</h3>` +
       `<div class="btns">${button({ act: 'help', args: ['welcome'], label: '❓ Comment jouer' })}${button({ act: 'help', args: ['privacy'], label: '🔒 Confidentialité' })}</div>` +
+      button({ act: 'report', label: '🐞 Signaler un problème', sub: 'Rapport à copier', wide: true }) +
       `<h3>Zone sensible</h3>` +
       button({ act: 'resetAsk', label: 'Recommencer de zéro', sub: 'Efface toute la partie', kind: 'ghost', wide: true }) +
       `<p class="sub center">IdlePort ${__APP_VERSION__}</p>`
@@ -799,6 +867,8 @@ export class App {
   }
 
   private pendingImport: GameState | null = null;
+  /** The open sheet is a one-question prompt: answering a setting closes it. */
+  private sheetPrompt = false;
 
   private async exportSave() {
     const code = await G.exportCode(this.state);
@@ -842,6 +912,8 @@ export class App {
     const step = guideStep(s, now);
     const open = unlocked(s);
     if (!isTabOpen(this.tab, open)) this.tab = 'tour';
+    // First missions: a hand points at the button to touch (comfort.css).
+    this.root.classList.toggle('ftue', s.missionIndex < 6);
     this.renderHud();
     this.celebrate(open);
 
@@ -924,12 +996,33 @@ export class App {
       fx.append(el);
       setTimeout(() => el.remove(), 2200);
     }
+    if (s.level > this.lastLevel) track('level', { lvl: s.level, min: Math.round((Date.now() - s.createdAt) / 60000) });
+    if (s.missionIndex > this.lastMission) track('mission', { m: s.missionIndex, min: Math.round((Date.now() - s.createdAt) / 60000) });
     this.lastLevel = s.level;
+    this.lastMission = s.missionIndex;
     if (this.sheet) return;
+    // After the first plane came back: offer reminders, the moment they make sense.
+    if (Capacitor.isNativePlatform() && !settings.notifAsked && s.missionIndex >= 5) {
+      setSetting('notifAsked', true);
+      this.sheet = () =>
+        `<div class="unlock"><div class="uicon">🔔</div><h2>Être prévenu ?</h2><p>Un petit rappel quand un avion atterrit, qu’un rayon est vide ou que le cadeau du jour est prêt. Jamais la nuit, et réglable dans ⚙ Réglages.</p></div>` +
+        button({ act: 'notifYes', label: 'Oui, me prévenir', kind: 'main', wide: true }) +
+        button({ act: 'notifNo', label: 'Non merci', kind: 'ghost', wide: true });
+      return;
+    }
+    if (TELEMETRY_URL && settings.analytics === 'unknown' && s.level >= 2) {
+      this.sheet = () =>
+        `<div class="unlock"><div class="uicon">📊</div><h2>Aider à améliorer le jeu ?</h2><p>Envoyer des statistiques anonymes : missions atteintes, durée des sessions, erreurs. Rien de personnel. Modifiable dans ⚙ Réglages.</p></div>` +
+        button({ act: 'set', args: ['analytics', 'yes'], label: 'D’accord', kind: 'main', wide: true }) +
+        button({ act: 'set', args: ['analytics', 'no'], label: 'Non merci', kind: 'ghost', wide: true });
+      this.sheetPrompt = true;
+      return;
+    }
     const fresh = [...open].find((f) => !this.known.has(f));
     if (!fresh) return;
     this.known.add(fresh);
     storage.set(UNLOCKED_KEY, JSON.stringify([...this.known]));
+    track('unlock', { f: fresh, lvl: s.level });
     const f = FEATURES[fresh];
     const tab = (['vols', 'equipe', 'objectifs', 'amis'] as const).find((t) => t === fresh) ?? (fresh === 'recherche' ? 'vols' : fresh === 'saison' ? 'objectifs' : 'tour');
     this.sheet = () =>
@@ -950,8 +1043,9 @@ export class App {
     morph(this.root.querySelector('#hud')!,
       `<div class="res-row">` +
       res('coins', '🪙', fmt(this.shownCoins, true), `+${perSec(G.totalShopRate(s))}/s`, gained ? 'gain' : '') +
-      res('miles', '✈️', String(s.miles), 'Miles') +
-      res('lounge', '👥', `${Math.floor(s.lounge.passengers)}/${G.loungeCap(s)}`, 'Passagers') +
+      // First steps: Miles and passengers appear when they start to matter.
+      (s.missionIndex >= 1 || s.level >= 2 ? res('miles', '✈️', String(s.miles), 'Miles') : '') +
+      (s.missionIndex >= 3 || s.level >= 2 ? res('lounge', '👥', `${Math.floor(s.lounge.passengers)}/${G.loungeCap(s)}`, 'Passagers') : '') +
       `<button class="gear" data-act="settings" aria-label="Réglages">⚙</button></div>` +
       `<button class="lvl" data-act="help" data-args='["level"]'><b>⭐ Niv. ${s.level}</b>${bar(s.xp / xpNeed, 'xp')}<small>${fmt(s.xp)}/${fmt(xpNeed)} XP</small></button>`);
   }

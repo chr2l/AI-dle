@@ -12,9 +12,17 @@ export interface Settings {
   motion: 'auto' | 'reduced' | 'full';
   text: 'normal' | 'large';
   fps: 30 | 60;
+  /** Reminders (local notifications) on, and the kinds the player turned off. */
+  notif: boolean;
+  notifOff: string[];
+  /** The « be told when a plane lands? » question was asked. */
+  notifAsked: boolean;
+  /** Anonymous statistics (telemetry.ts): not asked yet, accepted or refused. */
+  analytics: 'unknown' | 'yes' | 'no';
+  installId?: string;
 }
 
-const DEFAULTS: Settings = { sound: true, haptics: true, motion: 'auto', text: 'normal', fps: 30 };
+const DEFAULTS: Settings = { sound: true, haptics: true, motion: 'auto', text: 'normal', fps: 30, notif: true, notifOff: [], notifAsked: false, analytics: 'unknown' };
 
 function read(): Settings {
   try {

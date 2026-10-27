@@ -490,7 +490,7 @@ Chaque magasin ouvert au moins une fois (tirage, relance ou plan) entre dans l'a
 Chaque semaine (lundi 00 h UTC), un pays est à l'honneur, le même pour tous les joueurs, à tour de rôle : vols vers lui **+50 % de billets, ×2 ressource**, et ses VIP viennent deux fois plus souvent. Ça pousse à relancer la recherche de ce pays et à varier ses vols. Plus tard : un événement et un magasin exclusifs par semaine.
 
 ### 18.7 Notifications
-Au départ du joueur, le jeu calcule les rappels à programmer (`plannedNotifications`) : premier avion qui atterrit, premier rayon vide, étage terminé, recherche terminée, recrutement gratuit prêt, cadeau quotidien du lendemain (9 h). Une notification par type, branchées plus tard sur les notifications locales Capacitor.
+Au départ du joueur, le jeu calcule les rappels à programmer (`plannedNotifications`) : premier avion qui atterrit, premier rayon vide, étage terminé, recherche terminée, recrutement gratuit prêt, cadeau quotidien du lendemain (9 h). Une notification par type, programmée via `@capacitor/local-notifications` quand le joueur quitte le jeu et annulée à son retour. Jamais entre 22 h et 8 h (décalée à 8 h). La permission est demandée après le premier avion récupéré (mission 5), avec une phrase qui dit ce qu'on y gagne ; chaque type se coupe dans les Réglages.
 
 ### 18.8 Miles gagnés sans payer (simulation, joueur assidu)
 ~30 ✈️ par jour en régime établi (quêtes 14, cadeau ~2, succès, Millionnaire, événements rares), soit une recrue premium par jour ou de quoi accélérer les chronos clés. Les pubs (30 / jour) et les packs viennent en plus.
@@ -584,6 +584,8 @@ Interface DOM (`src/ui`) au-dessus de la vue cube art, pensée pour le portrait 
 - **Réglages** (⚙ dans le HUD) : sons, vibrations, animations (auto = réglage du téléphone, ou réduites), taille du texte, 30 ou 60 i/s, export et chargement de la sauvegarde, recommencer de zéro, confidentialité, version.
 - **Android** : le geste retour ferme la fenêtre ouverte, sinon revient à la Tour, sinon propose de quitter. Au retour d'arrière-plan après plus d'une minute, le récapitulatif hors ligne s'affiche.
 - **Chiffres** : à la française (« 9 999 », « 12,4 k », « 3,05 Md », puis Bn, Bd, Tn, Td, aa…) ; le compteur de pièces défile en continu.
+- **Premiers pas** : au premier lancement, une phrase de bienvenue (les règles complètes restent dans Réglages > Comment jouer). Pendant les 6 premières missions, une main animée pointe le bouton à toucher. Le compteur de Miles apparaît après la première mission, celui des passagers à la mission « Envoyer un vol ».
+- **Statistiques et erreurs** (`telemetry.ts`) : événements anonymes (sessions, missions, niveaux, déblocages, erreurs) gardés sur le téléphone ; envoyés seulement si une adresse de collecte est configurée au build (`VITE_TELEMETRY_URL`) et que le joueur accepte. Réglages > Signaler un problème donne un rapport à copier avec les dernières erreurs.
 - **Accessibilité** : zones tactiles de 44 px, texte de 12 px minimum, contour de focus visible.
 
 ## 22. Gamble : boîtes de plans et pari de rareté
