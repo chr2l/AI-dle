@@ -12,7 +12,7 @@ export interface GuideStep {
   /** data-tuto key of the button to highlight on that tab. */
   target?: string;
   /** Sub-view of the Vols tab. */
-  view?: 'avions' | 'pays' | 'recherche';
+  view?: 'avions' | 'departs' | 'pays' | 'recherche';
   text: string;
 }
 

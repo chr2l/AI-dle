@@ -71,10 +71,15 @@ import i_warning_circle from '@phosphor-icons/core/assets/fill/warning-circle-fi
 import i_wind from '@phosphor-icons/core/assets/fill/wind-fill.svg?raw';
 import i_wrench from '@phosphor-icons/core/assets/fill/wrench-fill.svg?raw';
 
+import i_x_circle from '@phosphor-icons/core/assets/fill/x-circle-fill.svg?raw';
+import i_hand_heart from '@phosphor-icons/core/assets/fill/hand-heart-fill.svg?raw';
 const svg = (raw: string, cls: string) => raw.replace('<svg ', `<svg class="ic${cls ? ` ic-${cls}` : ''}" aria-hidden="true" `);
 
 /** Emoji → icon. Longest sequences first so ZWJ emojis match before their parts. */
 const ICONS: [string, string][] = [
+  ['🧑‍🔧', svg(i_wrench, '')],
+  ['💁', svg(i_hand_heart, 'pink')],
+  ['✖', svg(i_x_circle, 'red')],
   ['👨‍✈️', svg(i_identification_badge, '')],
   ['🧑‍✈️', svg(i_identification_badge, '')],
   ['✈️', svg(i_airplane_tilt, 'sky')],
@@ -154,7 +159,8 @@ const ICONS: [string, string][] = [
   ['📈', svg(i_trend_up, 'green')],
 ];
 
-const PATTERN = new RegExp(ICONS.map(([e]) => e.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|'), 'gu');
+// Never match a piece of a longer ZWJ emoji (🧑‍🔧 must not become 🧑 + wrench).
+const PATTERN = new RegExp(`(?<!\u200D)(?:${ICONS.map(([e]) => e.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')})(?!\uFE0F?\u200D)`, 'gu');
 const BY_EMOJI = new Map(ICONS);
 
 /** Replaces the interface emojis in the text parts of an HTML string. */

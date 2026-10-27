@@ -36,7 +36,18 @@ const TABS: { id: Tab; icon: string; name: string }[] = [
   { id: 'amis', icon: '👋', name: 'Amis' },
 ];
 
-type VolsView = 'avions' | 'pays' | 'recherche';
+type VolsView = 'avions' | 'departs' | 'pays' | 'recherche';
+
+/** Sub-tab holding each tutorial target, so the guide can point at the sub-tab first. */
+const TARGET_SUB: Record<string, string> = {
+  send: 'plane:vol',
+  collect: 'plane:vol',
+  'rush-flight': 'plane:vol',
+  'upgrade-plane': 'plane:stats',
+  recruit: 'equipe:recruter',
+  assign: 'equipe:liste',
+  mission: 'objectifs:missions',
+};
 
 const WELCOME_KEY = 'idleport.welcome';
 const UNLOCKED_KEY = 'idleport.unlocked';
@@ -89,6 +100,8 @@ export class App {
   private sheetLocked = false;
   private toastTimer = 0;
   private dexTab: G.DexSectionId = 'shops';
+  /** Current sub-tab of each area (tab or plane card). */
+  private sub: Record<string, string> = {};
   private tower?: TowerView;
   private pointerDown = false;
   private pointer = { x: innerWidth / 2, y: innerHeight / 2 };
@@ -322,6 +335,10 @@ export class App {
       case 'vols':
         this.volsView = a[0];
         break;
+      case 'sub':
+        this.sub[a[0]] = a[1];
+        sound('tap');
+        break;
       case 'close':
         this.closeSheet();
         break;
@@ -443,7 +460,9 @@ export class App {
         break;
       case 'dex':
         this.dexTab = a[0] ?? this.dexTab;
-        this.sheet = () => this.dexSheet();
+        if (this.tab !== 'objectifs') this.goTab('objectifs');
+        this.sub.objectifs = 'dex';
+        if (this.sheet && !this.sheetLocked) this.closeSheet();
         break;
       case 'dexClaim': {
         const res = G.claimDexReward(s, a[0], a[1]);
@@ -717,7 +736,7 @@ export class App {
 
     const panel = this.root.querySelector<HTMLElement>('#panel')!;
     // A new tab or sub-view starts at the top.
-    const view = `${this.tab}:${this.volsView}`;
+    const view = `${this.tab}:${this.volsView}:${this.sub[this.tab] ?? ''}`;
     const sameView = panel.dataset.view === view;
     panel.dataset.view = view;
     panel.dataset.tab = this.tab;
@@ -742,7 +761,8 @@ export class App {
       else if (step.view && step.view !== this.volsView && !this.sheet) this.root.querySelector(`.seg [data-view="${step.view}"]`)?.classList.add('pulse');
       else if (step.target) {
         const sel = `[data-tuto="${step.target}"]`;
-        (this.sheet ? modal.querySelector(sel) : panel.querySelector(sel) ?? this.root.querySelector(sel))?.classList.add('pulse');
+        const el = this.sheet ? modal.querySelector(sel) : panel.querySelector(sel) ?? this.root.querySelector(sel);
+        (el ?? (this.sheet ? null : panel.querySelector(`.subs [data-for~="${step.target}"]`)))?.classList.add('pulse');
       }
     }
     if (this.flash && this.flash.until > now) this.root.querySelectorAll(`[data-key="${this.flash.key}"]`).forEach((el) => el.classList.add('flash'));
@@ -1098,12 +1118,11 @@ export class App {
       `<div class="btns">${use}${again}</div>` + button({ act: 'boxes', label: 'Retour aux boîtes', kind: 'ghost', wide: true });
   }
 
-  private dexSheet(): string {
+  private dexBody(): string {
     const s = this.state;
     const dex = G.dexView(s);
     const cur = dex.find((d) => d.id === this.dexTab) ?? dex[0];
-    let html = sheetHead('📖 Dex', 'Tout ce que vous avez trouvé. Les « ? » restent à découvrir : l’indice dit où chercher.') +
-      `<div class="seg dextabs">${dex.map((d) => {
+    let html = `<div class="seg dextabs">${dex.map((d) => {
         const ready = d.milestones.some((m) => m.reached && !m.claimed);
         return `<button class="${d.id === cur.id ? 'on' : ''}" data-act="dex" data-args='["${d.id}"]'>${d.emoji}<small>${d.found}/${d.total}</small>${ready ? '<i class="dot"></i>' : ''}</button>`;
       }).join('')}</div>`;
@@ -1111,7 +1130,7 @@ export class App {
       cur.milestones.map((m, k) => m.claimed
         ? chip(`✔ ${m.pct} %`, 'ok')
         : button({ act: 'dexClaim', args: [cur.id, k], label: `${m.pct} %`, sub: `${m.miles} ✈️`, small: true, kind: m.reached ? 'main' : undefined, why: m.reached ? false : `Trouvez ${Math.ceil((m.pct / 100) * cur.total)} entrées sur ${cur.total}.` }),
-      ).join('') + '</div></div>';
+      ).join('') + '</div><small>Les « ? » restent à découvrir : l’indice dit où chercher.</small></div>';
     html += `<div class="dexgrid">${cur.entries.map((e) => {
       const color = e.rarity ? RARITY_INFO[e.rarity].color : '';
       return e.seen
@@ -1154,17 +1173,29 @@ export class App {
 
   // --- Vols ------------------------------------------------------------------
 
+  /** Sub-tabs at the top of a tab: every screen fits without scrolling (lists aside). */
+  private subTabs(area: string, items: [id: string, icon: string, label: string, badge?: number][]): string {
+    if (!items.some(([id]) => id === this.sub[area])) this.sub[area] = items[0][0];
+    const cur = this.sub[area];
+    return `<div class="seg subs">${items.map(([id, icon, label, badge]) => {
+      const targets = Object.keys(TARGET_SUB).filter((k) => TARGET_SUB[k] === `${area}:${id}`).join(' ');
+      return `<button class="${id === cur ? 'on' : ''}" data-act="sub" data-args='["${area}","${id}"]'${targets ? ` data-for="${targets}"` : ''}><span class="si">${icon}</span><small>${label}</small>${badge ? `<i class="sb">${badge}</i>` : ''}</button>`;
+    }).join('')}</div>`;
+  }
+
   private vols(now: number): string {
     const s = this.state;
     const seg = (v: VolsView, label: string) => `<button class="${this.volsView === v ? 'on' : ''}" data-act="vols" data-args='["${v}"]' data-view="${v}">${label}</button>`;
     const research = unlocked(s).has('recherche');
     if (!research && this.volsView === 'recherche') this.volsView = 'avions';
     const pending = s.reports.filter((r) => r.pending);
-    let html = `<div class="seg">${seg('avions', `🛩️ Avions ${s.planes.length}/${G.hangarSize(s.level)}`)}${seg('pays', '🌍 Pays')}${research ? seg('recherche', `🔬 Recherche${s.researching ? ' ⏳' : ''}`) : ''}</div>`;
+    const landed = s.planes.filter((p) => p.flight && p.flight.endsAt <= now).length;
+    let html = `<div class="seg">${seg('avions', `🛩️ Avions ${s.planes.length}/${G.hangarSize(s.level)}`)}${seg('departs', `🛫 Départs${landed ? ` <i class="sb">${landed}</i>` : ''}`)}${seg('pays', '🌍 Pays')}${research ? seg('recherche', `🔬 Recherche${s.researching ? ' ⏳' : ''}`) : ''}</div>`;
     if (pending.length) {
       html += pending.map((r) => `<button class="alert" data-act="showReport" data-args='["${r.id}"]'>${EVENT_BY_ID[r.event!.defId].emoji} Incident au retour de ${esc(r.destName)} : touchez pour décider</button>`).join('');
     }
     if (this.volsView === 'avions') return html + this.fleet(now);
+    if (this.volsView === 'departs') return html + this.departures(now);
     if (this.volsView === 'pays') return html + this.countries(now);
     return html + this.researchView(now);
   }
@@ -1179,9 +1210,13 @@ export class App {
         button({ act: 'shop', label: 'Voir les avions', kind: 'main', wide: true, why: full ? `Hangar plein (${s.planes.length}/${G.hangarSize(s.level)}). Il s’agrandit tous les 3 niveaux.` : false }) +
         `</div></section>`,
     );
-    const rows = this.boardRows(now, 'jumpPlane');
-    const board = `<div class="board"><div class="bhead"><b>🛫 Départs et arrivées</b><span>👥 ${Math.floor(s.lounge.passengers)} en attente <button class="info" data-act="help" data-args='["fleet"]'>ⓘ</button></span></div>${rows}</div>`;
-    return board + `<div class="fleet">${pages.join('')}</div>`;
+    return `<div class="fleet">${pages.join('')}</div>`;
+  }
+
+  private departures(now: number): string {
+    const s = this.state;
+    return `<div class="board"><div class="bhead"><b>🛫 Départs et arrivées</b><span>👥 ${Math.floor(s.lounge.passengers)} en attente <button class="info" data-act="help" data-args='["fleet"]'>ⓘ</button></span></div>${this.boardRows(now, 'planeGo')}</div>` +
+      `<p class="note">Touchez un avion pour ouvrir sa fiche.</p>`;
   }
 
   /** Departure board: every plane at a glance, touch a row to open its card. */
@@ -1272,15 +1307,27 @@ export class App {
       return `<button class="seat${mod ? '' : ' empty'}" ${busy ? `data-why="${busy}"` : `data-act="slot" data-args='["${p.uid}",${slot}]'`}><span class="savatar">${mod ? mod.emoji : '🧩'}</span><b>${mod ? esc(mod.name) : 'Vide'}</b><small>${mod ? esc(mod.desc) : 'Installer ＋'}</small></button>`;
     }).join('');
 
+    const crewCount = ROLES.filter((r) => p.crew[r]).length;
+    const modCount = p.modules.filter(Boolean).length;
+    const upgradable = STAT_KEYS.filter((key) => p.upgrades[key] < MAX_STAT_LEVEL && s.coins >= G.planeUpgradeCost(model.price, p.upgrades[key])).length;
+    const tabs = this.subTabs('plane', [
+      ['vol', '🛫', 'Vol'],
+      ['stats', '📊', 'Améliorer', upgradable],
+      ['crew', '👨‍✈️', `Équipage ${crewCount}/${ROLES.length}`],
+      ['mods', '🧩', `Équip. ${modCount}/${p.modules.length}`],
+    ]);
+    const sub = this.sub.plane;
+    const body =
+      sub === 'stats' ? `<div class="card">${stats}</div>`
+      : sub === 'crew' ? `<p class="sub">Un pilote, un hôte et un mécano par avion. Touchez un siège pour choisir qui s’y assoit. <button class="info" data-act="help" data-args='["crew"]'>ⓘ</button></p><div class="seats">${seats}</div>`
+      : sub === 'mods' ? `<p class="sub">Les équipements se débloquent par la recherche. <button class="info" data-act="help" data-args='["modules"]'>ⓘ</button></p><div class="seats">${slots}</div>`
+      : `<div class="card status">${status}${actions}</div>${this.planeConditions(p, now)}`;
     return (
       `<section class="page" data-plane="${p.uid}">` +
       `<div class="plane-hero" style="--pc:${p.color}">${img ? `<img src="${img}" alt="">` : '<span class="bigplane">✈</span>'}` +
       `<div class="hero-top"><span class="pos">${k + 1}/${s.planes.length}</span><span class="model">${esc(model.name)}</span></div>` +
       `<button class="pname" data-act="renamePlane" data-args='["${p.uid}"]'>${esc(p.name)} ✏️</button></div>` +
-      `<div class="card status">${status}${actions}</div>` +
-      `${section('📊 Caractéristiques', 'stats')}<div class="card">${stats}</div>` +
-      `${section('👨‍✈️ Équipage', 'crew')}<div class="seats">${seats}</div>` +
-      `${section(`🧩 Équipements (${p.modules.filter(Boolean).length}/${p.modules.length})`, 'modules')}<div class="seats">${slots}</div>` +
+      tabs + body +
       `</section>`
     );
   }
@@ -1320,6 +1367,43 @@ export class App {
     return html;
   }
 
+  /** Why a VIP would be disappointed by this plane, or '' if it would be happy. */
+  private vipMiss(p: PlaneState, v: GameState['vips'][number]): string {
+    const st = G.planeStats(this.state, p);
+    if (!v.demand) return '';
+    if (st.comfort < v.demand.minComfort) return `confort ${st.comfort.toFixed(1)}/${v.demand.minComfort} 🛋️ insuffisant`;
+    if (v.demand.moduleId && !p.modules.includes(v.demand.moduleId)) return `il manque l’équipement ${MODULE_BY_ID[v.demand.moduleId]?.emoji ?? ''} ${MODULE_BY_ID[v.demand.moduleId]?.name ?? ''}`;
+    return '';
+  }
+
+  /** What a plane needs before taking off, and the risks on the way. */
+  private planeConditions(p: PlaneState, now: number): string {
+    const s = this.state;
+    const st = G.planeStats(s, p);
+    const rows: string[] = [];
+    const avoid = Math.min(100, Math.round(st.reliability * G.AVOID_PER_RELIABILITY * 100));
+    if (p.flight) {
+      const d = p.flight.destination;
+      rows.push(cond('info', weatherText(d.modifier)));
+      rows.push(cond('info', `Fiabilité ${Math.round(st.reliability)} : ${avoid} % de chances d’éviter un incident`));
+    } else {
+      const pax = Math.min(Math.floor(s.lounge.passengers), Math.floor(st.capacity));
+      rows.push(cond(pax >= 1, pax >= 1 ? `${pax}/${Math.floor(st.capacity)} passagers prêts à embarquer` : 'Aucun passager au hall : attendez qu’il en arrive'));
+      if (p.damaged) rows.push(cond(false, 'Endommagé : réparez-le avant de décoller'));
+      const ring = G.unlockedRing(s);
+      const dests = COUNTRIES.filter((c) => c.ring <= ring).flatMap((c) => G.destinationsFor(s.seed, c.id, now));
+      const reach = dests.filter((d) => d.distance <= st.range).length;
+      rows.push(cond(reach === dests.length ? true : reach ? 'warn' : false, `Autonomie ${Math.floor(st.range)} km : ${reach}/${dests.length} destinations à portée${reach < dests.length ? ' (améliorez l’autonomie pour les autres)' : ''}`));
+      rows.push(cond('info', `Fiabilité ${Math.round(st.reliability)} : ${avoid} % de chances d’éviter un incident`));
+      for (const v of s.vips.filter((x) => x.demand)) {
+        const miss = this.vipMiss(p, v);
+        const c = COUNTRY_BY_ID[v.demand!.countryId];
+        rows.push(cond(!miss, `${vipPic(v.defId)} ${esc(VIP_BY_ID[v.defId].name)} → ${c.emoji} ${c.name} : ${miss || 'cet avion lui convient'}`));
+      }
+    }
+    return `<div class="card conds"><b>📋 Conditions de vol</b>${rows.join('')}</div>`;
+  }
+
   private destSheet(planeUid: string): string {
     const s = this.state;
     const now = this.now;
@@ -1337,11 +1421,22 @@ export class App {
         const mod = G.MODIFIER_INFO[d.modifier];
         const coins = G.ticketIncome(d.distance, pax, st.comfort) * mod.coins * mult;
         const res = G.resourceIncome(pax, c.ring) * mod.resource;
-        const why = can.ok ? false : can.error === 'Autonomie insuffisante.' ? `Autonomie insuffisante : ${d.distance} km demandés, l’avion fait ${Math.floor(st.range)} km.` : can.error;
-        return `<div class="dest"><div class="grow"><b>${esc(d.name)}</b><div class="chips">${chip(`${d.distance} km`)}${chip(`⏱ ${dur(G.flightDuration(d.distance, st.speed) * 1000)}`)}${d.modifier !== 'calme' ? chip(mod.name, d.modifier) : ''}</div>` +
+        const why = can.ok ? (pax < 1 ? 'Aucun passager au hall.' : false) : can.error === 'Autonomie insuffisante.' ? `Autonomie insuffisante : ${d.distance} km demandés, l’avion fait ${Math.floor(st.range)} km.` : can.error;
+        const durSec = G.flightDuration(d.distance, st.speed);
+        const ev = d.modifier === 'mystere' ? 100 : Math.round(G.eventChance(durSec) * 100);
+        const conds = [
+          cond(d.distance <= st.range, d.distance <= st.range ? `${d.distance}/${Math.floor(st.range)} km` : `il manque ${Math.ceil(d.distance - st.range)} km d’autonomie`),
+          cond(d.modifier === 'tempete' ? 'warn' : 'info', weatherText(d.modifier)),
+          cond('info', `événement en vol ${ev} %`),
+          ...vips.map((v) => {
+            const miss = this.vipMiss(plane, v);
+            return cond(!miss, `${vipPic(v.defId)} ${miss || 'VIP ravi'}`);
+          }),
+        ].join('');
+        return `<div class="dest"><div class="grow"><b>${esc(d.name)}</b><div class="chips">${chip(`⏱ ${dur(durSec * 1000)}`)}${d.modifier !== 'calme' ? chip(mod.name, d.modifier) : ''}</div><div class="conds">${conds}</div>` +
           `<small>≈ +${fmt(coins)} 🪙 · +${fmt(res)} ${c.resource.emoji}</small></div>${button({ act: 'send', args: [planeUid, d], label: '🛫', sub: 'Décoller', kind: 'main', small: true, why })}</div>`;
       });
-      const vipNote = vips.length ? `<small class="vipnote">${vips.map((v) => vipPic(v.defId)).join('')} ${vips.length} VIP veut y aller (confort ≥ ${Math.max(...vips.map((v) => v.demand!.minComfort))})</small>` : '';
+      const vipNote = vips.length ? `<small class="vipnote">${vips.map((v) => vipPic(v.defId)).join('')} ${vips.length} VIP embarquera s’il part vers ${c.name}</small>` : '';
       return `<div class="country"><div class="chead"><b>${c.emoji} ${c.name}</b>${c.id === featured ? chip('À la une ×1,5', 'gold') : ''}<small>${c.resource.emoji} ${c.resource.name}</small></div>${vipNote}${rows.join('')}</div>`;
     });
     return sheetHead(`🛫 Où envoyer ${esc(plane.name)} ?`, `${pax} passagers à bord · autonomie ${Math.floor(st.range)} km · confort ${st.comfort.toFixed(1)}`) + groups.join('') +
@@ -1442,15 +1537,26 @@ export class App {
     const freeAt = s.cooldowns.free_recruit ?? 0;
     const full = s.crew.length >= G.MAX_CREW ? `Équipe complète (${G.MAX_CREW} max).` : false;
     const cost = G.recruitCost(s.level);
-    let html = section(`🧑‍✈️ Recrutement · ${s.crew.length}/${G.MAX_CREW}`, 'recruit') +
+    const idle = s.crew.filter((m) => !m.planeUid).length;
+    let html = this.subTabs('equipe', [
+      ['recruter', '🎲', `Recruter ${s.crew.length}/${G.MAX_CREW}`, freeAt <= now && !full ? 1 : 0],
+      ['liste', '👥', 'Mon équipe', idle && s.planes.length ? idle : 0],
+    ]);
+    if (this.sub.equipe === 'liste') return html + this.crewList();
+    html += section(`🧑‍✈️ Recrutement · ${s.crew.length}/${G.MAX_CREW}`, 'recruit') +
       `<div class="roles">${ROLES.map((r) => `<div><span>${ROLE_INFO[r].emoji}</span><b>${ROLE_INFO[r].name}</b><small>${ROLE_INFO[r].desc}</small></div>`).join('')}</div>` +
       `<div class="col">` +
       button({ act: 'recruit', args: ['coins'], label: '🎲 Recrue standard', sub: `${fmt(cost)} 🪙 · surtout Commun et Rare`, wide: true, tuto: 'recruit', why: full || lack(s.coins, cost, 'pièces 🪙') }) +
       button({ act: 'recruit', args: ['miles'], label: '💎 Recrue premium', sub: `${PREMIUM_RECRUIT_MILES} ✈️ · Rare minimum`, kind: 'rush', wide: true, why: full || lack(s.miles, PREMIUM_RECRUIT_MILES, 'Miles ✈️') }) +
       button({ act: 'recruit', args: ['ad'], label: '📺 Recrue gratuite', sub: freeAt > now ? `Disponible dans ${dur(freeAt - now)}` : 'Regarder une pub', kind: 'ad', wide: true, why: full || (freeAt > now ? `Revenez dans ${dur(freeAt - now)}.` : false) }) +
       `</div>`;
-    html += section('👥 Mon équipe', 'crew');
-    if (!s.crew.length) html += '<p class="note">Personne pour l’instant : recrutez votre premier équipier ci-dessus.</p>';
+    return html;
+  }
+
+  private crewList(): string {
+    const s = this.state;
+    let html = section(`👥 Mon équipe · ${s.crew.filter((m) => m.planeUid).length} à bord`, 'crew');
+    if (!s.crew.length) html += '<p class="note">Personne pour l’instant : recrutez votre premier équipier dans « Recruter ».</p>';
     const sorted = [...s.crew].sort((a, b) => Number(!!a.planeUid) - Number(!!b.planeUid) || RARITY_INFO[b.rarity].rank - RARITY_INFO[a.rarity].rank);
     for (const m of sorted) {
       html += `<div class="card pick">${this.crewLine(m)}` +
@@ -1484,14 +1590,25 @@ export class App {
   private amis(now: number): string {
     const s = this.state;
     G.syncWeek(s, now);
-    let html = section('🪪 Mon profil', 'social') +
-      `<div class="card profile"><div class="line"><div class="grow"><b>${esc(s.social.name)}</b><small>Votre code ami</small><div class="code">${esc(s.social.code)}</div></div>` +
-      `<div class="col">${button({ act: 'copyCode', label: '📋 Copier', small: true })}${button({ act: 'rename', label: '✏️ Nom', small: true, kind: 'ghost' })}</div></div></div>`;
-    html += section('🏆 Classement de la semaine');
     const last = s.social.lastWeek;
+    const tabs = this.subTabs('amis', [
+      ['amis', '👋', `Amis ${s.social.friends.length}`],
+      ['classement', '🏆', 'Classement', last && !last.claimed ? 1 : 0],
+      ['profil', '🪪', 'Mon profil'],
+    ]);
+    const sub = this.sub.amis;
+    if (sub === 'profil') return tabs + section('🪪 Mon profil', 'social') +
+      `<div class="card profile"><div class="line"><div class="grow"><b>${esc(s.social.name)}</b><small>Votre code ami</small><div class="code">${esc(s.social.code)}</div></div>` +
+      `<div class="col">${button({ act: 'copyCode', label: '📋 Copier', small: true })}${button({ act: 'rename', label: '✏️ Nom', small: true, kind: 'ghost' })}</div></div></div>` +
+      '<p class="note">Donnez ce code à vos amis : ils pourront vous ajouter, vous envoyer un cadeau par jour et visiter votre aéroport.</p>';
+    let html = tabs;
+    if (sub === 'classement') {
+    html += section('🏆 Classement de la semaine');
     if (last && !last.claimed) html += `<div class="card hint"><div class="line"><div class="grow"><b>Semaine passée : ${last.rank}ᵉ sur ${last.players}</b><small>Votre récompense vous attend</small></div>${button({ act: 'weekly', label: '🏆 Récupérer', kind: 'main', small: true })}</div></div>`;
     html += '<div class="card">' + G.friendsLeaderboard(s, now).map((r, k) =>
       `<div class="rank${r.me ? ' me' : ''}"><span class="rpos">${['🥇', '🥈', '🥉'][k] ?? k + 1}</span><b class="grow">${esc(r.name)}${r.me ? ' (vous)' : ''}</b><span>${fmt(r.score)} 🪙</span></div>`).join('') + '<small>Pièces gagnées depuis lundi.</small></div>';
+    return html + `<p class="note">Récompense le lundi selon votre rang : 1ᵉʳ 30 ✈️, 2ᵉ 20 ✈️, 3ᵉ 10 ✈️, les autres 5 ✈️.</p>`;
+    }
     html += section(`👋 Amis ${s.social.friends.length}/${G.MAX_FRIENDS}`);
     if (!s.social.friends.length) html += '<p class="note">Échangez vos codes ami pour vous envoyer un cadeau par jour et visiter vos aéroports. Le serveur social arrive bientôt : pour l’instant aucun code ne peut être trouvé.</p>';
     for (const f of s.social.friends) {
@@ -1510,21 +1627,71 @@ export class App {
   private objectifs(now: number): string {
     const s = this.state;
     G.refreshQuests(s, now);
-    let html = '';
+    const open = unlocked(s);
     const mission = G.currentMission(s);
+    const daily = G.dailyStatus(s, now);
+    const quests = G.questViews(s, now);
+    const chestReady = !s.quests.chestClaimed && s.quests.claimed.every(Boolean);
+    const season = open.has('saison') ? G.seasonView(s, now) : undefined;
+    const achievements = G.achievementViews(s);
+    const tabs: [string, string, string, number?][] = [
+      ['missions', '📋', 'Missions', (mission?.done ? 1 : 0) + (daily.available ? 1 : 0)],
+      ['quetes', '📅', `Quêtes ${quests.filter((q) => q.claimed).length}/${quests.length}`, quests.filter((q) => q.done && !q.claimed).length + (chestReady ? 1 : 0)],
+    ];
+    if (open.has('saison')) tabs.push(['saison', season ? season.season.def.emoji : '🎉', 'Événement', season?.track.filter((x) => x.reached && !x.claimed).length]);
+    tabs.push(['succes', '🏆', 'Succès', achievements.filter((a) => a.done && !a.claimed).length]);
+    if (open.has('dex')) tabs.push(['dex', '📖', 'Dex', G.dexClaimable(s)]);
+    let html = this.subTabs('objectifs', tabs);
+    const sub = this.sub.objectifs;
+
+    if (sub === 'dex') return html + this.dexBody();
+
+    if (sub === 'quetes') {
+      html += section('📅 Quêtes du jour', 'quests');
+      quests.forEach((q, k) => {
+        html += `<div class="card${q.done && !q.claimed ? ' hint' : ''}"><div class="line"><div class="grow"><b>${esc(q.text)}</b>${bar(q.progress / q.goal)}<small>${fmt(q.progress)}/${fmt(q.goal)} · 🎁 ${QUEST_MILES} ✈️ + pièces</small></div>` +
+          (q.claimed ? chip('✔ Fait', 'ok') : button({ act: 'quest', args: [k], label: 'Valider', small: true, kind: 'main', why: q.done ? false : 'Quête pas encore terminée.' })) + '</div></div>';
+      });
+      return html + button({
+        act: 'chest',
+        label: '🧰 Coffre bonus',
+        sub: s.quests.chestClaimed ? 'Déjà ouvert aujourd’hui' : `${QUEST_CHEST_MILES} ✈️ quand les 3 quêtes sont validées`,
+        wide: true,
+        kind: 'main',
+        why: s.quests.chestClaimed ? 'Coffre déjà ouvert aujourd’hui.' : !chestReady ? 'Validez d’abord les 3 quêtes du jour.' : false,
+      }) + `<p class="note">Nouvelles quêtes dans ${dur(86400_000 - (now % 86400_000))}.</p>`;
+    }
+
+    if (sub === 'saison') {
+      if (!season) {
+        const next = G.nextSeason(now);
+        return html + section('🎉 Événement saisonnier', 'season') + `<p class="note">Prochain : ${next.def.emoji} ${esc(next.def.name)} dans ${dur(next.startsAt - now)}.</p>`;
+      }
+      const def = season.season.def;
+      const country = COUNTRY_BY_ID[def.country];
+      html += `<div class="card hint"><b>${def.emoji} ${esc(def.name)} · ${fmt(season.points)} ${def.currency.emoji}</b><small>${esc(def.text)}</small><small>Vols vers ${country.emoji} ${country.name} : points ×2 · fin dans ${dur(season.season.endsAt - now)}</small></div>`;
+      season.track.forEach((step, k) => {
+        html += `<div class="card mini"><div class="line"><div class="grow"><b>${rewardLabel(step.reward, s.level, SHOP_BY_ID[def.shopId]?.name)}</b>${bar(Math.min(1, season.points / step.points))}<small>${fmt(Math.min(season.points, step.points))}/${fmt(step.points)} ${def.currency.emoji}</small></div>` +
+          (step.claimed ? chip('✔', 'ok') : button({ act: 'season', args: [k], label: 'Prendre', small: true, kind: 'main', why: step.reached ? false : 'Palier pas encore atteint.' })) + '</div></div>';
+      });
+      return html;
+    }
+
+    if (sub === 'succes') {
+      const views = achievements.filter((x) => !x.claimed).sort((a, b) => Number(b.done) - Number(a.done) || b.progress / b.def.goal - a.progress / a.def.goal);
+      html += section(`🏆 Succès · ${achievements.filter((a) => a.claimed).length}/${achievements.length}`, 'achievements');
+      for (const a of views) {
+        html += `<div class="card mini${a.done ? ' hint' : ''}"><div class="line"><div class="grow"><b>${esc(a.def.text)}</b>${bar(Math.min(1, a.progress / a.def.goal))}<small>${fmt(a.progress)}/${fmt(a.def.goal)} · 🎁 ${a.def.miles} ✈️</small></div>` +
+          button({ act: 'achievement', args: [a.def.id], label: 'Valider', small: true, kind: 'main', why: a.done ? false : 'Pas encore atteint.' }) + '</div></div>';
+      }
+      return html;
+    }
+
     if (mission) {
       html += section(`📋 Mission ${s.missionIndex + 1}`, 'mission') +
         `<div class="card${mission.done ? ' hint' : ''}"><div class="line"><div class="grow"><b>${esc(mission.def.text)}</b>${bar(mission.progress / mission.def.goal)}<small>${mission.progress}/${mission.def.goal} · 🎁 ${mission.def.miles} ✈️${mission.def.coins ? ` + ${mission.def.coins} 🪙` : ''}</small></div>` +
         button({ act: 'mission', label: 'Récupérer', kind: 'main', small: true, tuto: 'mission', why: mission.done ? false : 'Mission pas encore accomplie.' }) + '</div></div>';
-    }
-    if (unlocked(s).has('dex')) {
-      const dex = G.dexView(s);
-      const found = dex.reduce((n, d) => n + d.found, 0);
-      const total = dex.reduce((n, d) => n + d.total, 0);
-      const ready = G.dexClaimable(s);
-      html += `<div class="card dexcard${ready ? ' hint' : ''}" data-act="dex" data-args="[null]" role="button"><span class="dexicon">📖</span><span class="grow"><b>Dex · ${found}/${total} trouvés</b>${bar(found / total)}<small>${ready ? `🎁 ${ready} récompense(s) à récupérer` : dex.map((d) => `${d.emoji} ${d.found}/${d.total}`).join(' · ')}</small></span><span class="go">▸</span></div>`;
-    }
-    const daily = G.dailyStatus(s, now);
+    } else html += section('📋 Missions', 'mission') + '<p class="note">Toutes les missions sont terminées. Bravo !</p>';
     html += section('🎁 Cadeau du jour', 'daily') + '<div class="card"><div class="days">' +
       DAILY_REWARDS.map((r, k) => {
         const day = k + 1;
@@ -1532,43 +1699,6 @@ export class App {
         return `<div class="day ${state}"><small>J${day}</small><span>${dailyIcon(r)}</span></div>`;
       }).join('') + '</div>' +
       button({ act: 'daily', label: daily.available ? `Récupérer : ${dailyLabel(daily.reward, s.level)}` : 'Déjà récupéré, revenez demain', kind: 'main', wide: true, why: daily.available ? false : 'Revenez demain pour le jour suivant.' }) + '</div>';
-
-    const quests = G.questViews(s, now);
-    html += section(`📅 Quêtes du jour ${quests.filter((q) => q.claimed).length}/${quests.length}`, 'quests');
-    quests.forEach((q, k) => {
-      html += `<div class="card${q.done && !q.claimed ? ' hint' : ''}"><div class="line"><div class="grow"><b>${esc(q.text)}</b>${bar(q.progress / q.goal)}<small>${fmt(q.progress)}/${fmt(q.goal)} · 🎁 ${QUEST_MILES} ✈️ + pièces</small></div>` +
-        (q.claimed ? chip('✔ Fait', 'ok') : button({ act: 'quest', args: [k], label: 'Valider', small: true, kind: 'main', why: q.done ? false : 'Quête pas encore terminée.' })) + '</div></div>';
-    });
-    html += button({
-      act: 'chest',
-      label: '🧰 Coffre bonus',
-      sub: s.quests.chestClaimed ? 'Déjà ouvert aujourd’hui' : `${QUEST_CHEST_MILES} ✈️ quand les 3 quêtes sont validées`,
-      wide: true,
-      kind: 'main',
-      why: s.quests.chestClaimed ? 'Coffre déjà ouvert aujourd’hui.' : !s.quests.claimed.every(Boolean) ? 'Validez d’abord les 3 quêtes du jour.' : false,
-    });
-
-    const season = unlocked(s).has('saison') ? G.seasonView(s, now) : undefined;
-    if (season) {
-      const def = season.season.def;
-      const country = COUNTRY_BY_ID[def.country];
-      html += section(`${def.emoji} ${esc(def.name)}`, 'season') +
-        `<div class="card hint"><b>${fmt(season.points)} ${def.currency.emoji} ${esc(def.currency.name)}</b><small>${esc(def.text)}</small><small>Vols vers ${country.emoji} ${country.name} : points ×2 · fin dans ${dur(season.season.endsAt - now)}</small></div>`;
-      season.track.forEach((step, k) => {
-        html += `<div class="card"><div class="line"><div class="grow"><b>${rewardLabel(step.reward, s.level, SHOP_BY_ID[def.shopId]?.name)}</b>${bar(Math.min(1, season.points / step.points))}<small>${fmt(Math.min(season.points, step.points))}/${fmt(step.points)} ${def.currency.emoji}</small></div>` +
-          (step.claimed ? chip('✔', 'ok') : button({ act: 'season', args: [k], label: 'Prendre', small: true, kind: 'main', why: step.reached ? false : 'Palier pas encore atteint.' })) + '</div></div>';
-      });
-    } else if (unlocked(s).has('saison')) {
-      const next = G.nextSeason(now);
-      html += section('🎉 Événement saisonnier', 'season') + `<p class="note">Prochain : ${next.def.emoji} ${esc(next.def.name)} dans ${dur(next.startsAt - now)}.</p>`;
-    }
-
-    html += section('🏆 Succès', 'achievements');
-    const views = G.achievementViews(s).filter((x) => !x.claimed).sort((a, b) => Number(b.done) - Number(a.done)).slice(0, 8);
-    for (const a of views) {
-      html += `<div class="card${a.done ? ' hint' : ''}"><div class="line"><div class="grow"><b>${esc(a.def.text)}</b>${bar(Math.min(1, a.progress / a.def.goal))}<small>${fmt(a.progress)}/${fmt(a.def.goal)} · 🎁 ${a.def.miles} ✈️</small></div>` +
-        button({ act: 'achievement', args: [a.def.id], label: 'Valider', small: true, kind: 'main', why: a.done ? false : 'Pas encore atteint.' }) + '</div></div>';
-    }
     return html;
   }
 }
@@ -1578,8 +1708,29 @@ function pic(url: string | undefined, fallback: string, cls: string): string {
   return url ? `<img class="pic ${cls}" src="${url}" alt="">` : fallback;
 }
 const shopPic = (id: string, size = '') => pic(shopSnapshot(id), SHOP_BY_ID[id]?.emoji ?? '?', `shop ${size}`);
-const vipPic = (id: string, size = '') => pic(vipSnapshot(id), VIP_BY_ID[id]?.emoji ?? '?', `vip ${size}`);
+const vipPic = (id: string, size = '') => pic(vipSnapshot(id), VIP_BY_ID[id]?.emoji ?? '?', `vp ${size}`);
 const planePic = (id: string) => pic(planeSnapshot(id), '✈️', 'plane lg');
+
+/** One condition line: ✔ met, ✖ missing, ⚠ risky, ⓘ information. */
+function cond(state: boolean | 'warn' | 'info', html: string): string {
+  const [cls, icon] = state === 'info' ? ['info', 'ⓘ'] : state === 'warn' ? ['warn', '⚠️'] : state ? ['ok', '✔'] : ['ko', '✖'];
+  return `<span class="cond ${cls}"><i>${icon}</i>${html}</span>`;
+}
+
+function weatherText(m: G.DestinationModifier): string {
+  switch (m) {
+    case 'festival':
+      return 'Festival : +50 % de ressources';
+    case 'ruee':
+      return 'Ruée : +50 % de billets';
+    case 'tempete':
+      return 'Tempête : gains ×2, mais deux fois plus d’incidents';
+    case 'mystere':
+      return 'Mystère : un événement rare garanti';
+    default:
+      return 'Temps calme, rien à signaler';
+  }
+}
 
 function fmtPct(p: number): string {
   const v = p * 100;
