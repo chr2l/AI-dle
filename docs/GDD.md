@@ -584,6 +584,10 @@ Interface DOM (`src/ui`) au-dessus de la vue cube art, pensée pour le portrait 
 - **Réglages** (⚙ dans le HUD) : sons, vibrations, animations (auto = réglage du téléphone, ou réduites), taille du texte, 30 ou 60 i/s, export et chargement de la sauvegarde, recommencer de zéro, confidentialité, version.
 - **Android** : le geste retour ferme la fenêtre ouverte, sinon revient à la Tour, sinon propose de quitter. Au retour d'arrière-plan après plus d'une minute, le récapitulatif hors ligne s'affiche.
 - **Chiffres** : à la française (« 9 999 », « 12,4 k », « 3,05 Md », puis Bn, Bd, Tn, Td, aa…) ; le compteur de pièces défile en continu.
+- **Confort du milieu de partie** : « Tout récupérer » (Vols, dès 2 avions rentrés, niveau 4) et « Tout réapprovisionner » (Tour, dès 2 rayons vides, niveau 6, même taille de commande pour tous) ; mêmes coûts et gains qu'un par un.
+- **Retour** : l'écran « Bon retour ! » liste ce qui attend (avions rentrés, incidents, rayons vides, VIP, cadeau du jour, recrue gratuite), chacun avec son raccourci.
+- **Tirages** : ouvrir ou relancer un magasin le révèle avec un court suspense (dé, puis le magasin dans la lueur de sa rareté, son et vibration plus forts pour Épique et Légendaire).
+- **Musique** : synthétisée, une ambiance par pays de la semaine (tonalité, tempo, timbre), très discrète, coupée en arrière-plan ; interrupteur dans les Réglages.
 - **Premiers pas** : au premier lancement, une phrase de bienvenue (les règles complètes restent dans Réglages > Comment jouer). Pendant les 6 premières missions, une main animée pointe le bouton à toucher. Le compteur de Miles apparaît après la première mission, celui des passagers à la mission « Envoyer un vol ».
 - **Statistiques et erreurs** (`telemetry.ts`) : événements anonymes (sessions, missions, niveaux, déblocages, erreurs) gardés sur le téléphone ; envoyés seulement si une adresse de collecte est configurée au build (`VITE_TELEMETRY_URL`) et que le joueur accepte. Réglages > Signaler un problème donne un rapport à copier avec les dernières erreurs.
 - **Accessibilité** : zones tactiles de 44 px, texte de 12 px minimum, contour de focus visible.

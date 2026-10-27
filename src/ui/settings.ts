@@ -7,6 +7,8 @@ const OLD_MUTE_KEY = 'idleport.mute';
 
 export interface Settings {
   sound: boolean;
+  /** Background music (music.ts). */
+  music: boolean;
   haptics: boolean;
   /** auto = follow the phone's « reduce animations » setting. */
   motion: 'auto' | 'reduced' | 'full';
@@ -22,7 +24,7 @@ export interface Settings {
   installId?: string;
 }
 
-const DEFAULTS: Settings = { sound: true, haptics: true, motion: 'auto', text: 'normal', fps: 30, notif: true, notifOff: [], notifAsked: false, analytics: 'unknown' };
+const DEFAULTS: Settings = { sound: true, music: true, haptics: true, motion: 'auto', text: 'normal', fps: 30, notif: true, notifOff: [], notifAsked: false, analytics: 'unknown' };
 
 function read(): Settings {
   try {
