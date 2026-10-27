@@ -4,6 +4,7 @@
 import { Capacitor } from '@capacitor/core';
 import { Directory, Filesystem } from '@capacitor/filesystem';
 import { Share } from '@capacitor/share';
+import { t } from '../i18n';
 
 export interface PhotoCaption {
   name: string;
@@ -53,7 +54,7 @@ export async function framePhoto(view: string, caption: PhotoCaption): Promise<s
   g.fillText(caption.name, 48, H - 130);
   g.fillStyle = '#f6f4ff';
   g.font = '700 40px "Nunito", sans-serif';
-  g.fillText(`Niveau ${caption.level} · ${caption.floors} étage${caption.floors > 1 ? 's' : ''}`, 48, H - 70);
+  g.fillText(t(caption.floors > 1 ? 'Niveau {level} · {floors} étages' : 'Niveau {level} · {floors} étage', { level: caption.level, floors: caption.floors }), 48, H - 70);
   g.textAlign = 'right';
   g.fillStyle = '#c3c0ea';
   g.font = '56px "Lilita One", "Nunito", sans-serif';
@@ -63,11 +64,11 @@ export async function framePhoto(view: string, caption: PhotoCaption): Promise<s
 
 /** Opens the share sheet with the photo. Returns false when the player cancelled or nothing could share. */
 export async function sharePhoto(png: string): Promise<boolean> {
-  const text = 'Mon aéroport sur IdlePort ✈️';
+  const text = t('Mon aéroport sur IdlePort ✈️');
   try {
     if (Capacitor.isNativePlatform()) {
       const file = await Filesystem.writeFile({ path: `idleport-${Date.now()}.png`, data: png.split(',')[1], directory: Directory.Cache });
-      await Share.share({ title: 'IdlePort', text, files: [file.uri], dialogTitle: 'Partager mon aéroport' });
+      await Share.share({ title: 'IdlePort', text, files: [file.uri], dialogTitle: t('Partager mon aéroport') });
       return true;
     }
     const blob = await (await fetch(png)).blob();

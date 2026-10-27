@@ -53,3 +53,31 @@ Ce qui est prêt dans le dépôt, et ce qu'il reste à faire avec ton compte.
 > Un jeu de gestion idle tout en cubes, à jouer quelques minutes ou des heures. Pas de pub imposée : les pubs sont toujours un choix, contre une récompense.
 
 **Catégorie** : Jeux > Simulation. **Tags** : idle, gestion, tycoon, aéroport.
+
+### English listing
+
+**Title** (30 chars): IdlePort: Idle Airport Tycoon
+
+**Short description** (80 chars): Build your airport floor by floor and fly your planes to the ends of the world!
+
+**Full description**:
+
+> Welcome to IdlePort, the airport that grows with you!
+>
+> 🏢 **Build your tower** floor by floor and open randomly drawn shops: snack bars, souvenir stores, futuristic lounges… Every shop sells on its own, even when the game is closed.
+>
+> ✈️ **Send your planes** to imaginary countries: Melodia, Tropicalia, Bitopia, Frostburg, Infernia… Bring back passengers, tickets and exotic resources.
+>
+> 👨‍✈️ **Hire your crew**: pilots, flight attendants and mechanics with rare talents, to seat in the right plane.
+>
+> 🧪 **Merge your shops** to discover legendary stores and complete your Dex.
+>
+> 🌟 **Open franchises** to start over stronger, with stars that boost all your earnings.
+>
+> 🎉 Seasonal events, daily quests, daily gifts, wacky VIPs and more than 40 achievements.
+>
+> A cube-art idle management game, to play for a few minutes or for hours. No forced ads: ads are always a choice, in exchange for a reward.
+
+**Category**: Games > Simulation. **Tags**: idle, tycoon, management, airport.
+
+The game picks English on phones not set to French (Settings › Language to change). Upload the English captures (`en-412x915-*.png` from the « captures » CI artifact) for the English listing.

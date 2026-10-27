@@ -34,6 +34,7 @@ import { Capacitor } from '@capacitor/core';
 import { applySettings, onSettings, reducedMotion, setSetting, settings, type Settings } from './settings';
 import { confetti, flyTo, haptic, sound } from './fx';
 import { FEATURES, guideStep, isTabOpen, tabBadges, unlocked, type Feature, type Tab } from './tutorial';
+import { currentLang } from '../i18n';
 import { bar, button, chip, dec, dur, esc, fmt, lack, morph, perSec, pips, section, sheetHead, timerBar } from './widgets';
 
 export { dur, fmt } from './widgets';
@@ -972,6 +973,7 @@ export class App {
       row('Animations', 'Pièces volantes, confettis, transitions. « Auto » suit le réglage du téléphone.', 'motion', [['auto', 'Auto'], ['full', 'Toutes'], ['reduced', 'Réduites']]) +
       row('Taille du texte', 'Agrandit les panneaux et les fenêtres.', 'text', [['normal', 'Normale'], ['large', 'Grande']]) +
       row('Couleurs', 'Palette lisible pour les daltoniens (raretés, états).', 'palette', [['normal', 'Standard'], ['cvd', 'Daltonien']]) +
+      row('Langue', 'Auto suit la langue du téléphone.', 'lang', [['auto', 'Auto'], ['fr', 'Français'], ['en', 'English']]) +
       row('Fluidité de la vue', '60 images par seconde : plus doux, use plus la batterie.', 'fps', [[30, '30 i/s'], [60, '60 i/s']]) +
       `<h3>Rappels</h3>` +
       row('Notifications', 'Avion rentré, rayon vide, cadeau du jour… Jamais entre 22 h et 8 h.', 'notif', [[true, 'Activées'], [false, 'Coupées']]) +
@@ -997,7 +999,7 @@ export class App {
     return (
       sheetHead(`👤 ${esc(s.social.name)}`, `Code ami ${esc(s.social.code)}`) +
       `<div class="card"><b>⭐ Niveau ${s.level}</b>${bar(s.xp / xpNeed, 'xp')}<small>${fmt(s.xp)}/${fmt(xpNeed)} XP · chaque dépense et chaque vol en rapporte. Monter ouvre des étages, des avions et des pays.</small></div>` +
-      `<h3>Carrière</h3><div class="career">${lines.map((l) => `<div><span>${l.icon}</span><b>${l.coins ? fmt(l.value) : l.value.toLocaleString('fr-FR')}</b><small>${l.label}</small></div>`).join('')}</div>` +
+      `<h3>Carrière</h3><div class="career">${lines.map((l) => `<div><span>${l.icon}</span><b>${l.coins ? fmt(l.value) : l.value.toLocaleString(currentLang() === 'en' ? 'en-US' : 'fr-FR')}</b><small>${l.label}</small></div>`).join('')}</div>` +
       (this.tower ? button({ act: 'photo', label: '📷 Photo de mon aéroport', sub: 'À partager avec vos amis', kind: 'main', wide: true }) : '') +
       button({ act: 'close', label: 'Fermer', kind: 'ghost', wide: true })
     );
