@@ -34,7 +34,7 @@ function viewFor(width: number, height: number, background: string): PixelRender
 }
 
 /** portrait: frame the upper part of a tall model (head and shoulders) instead of the whole of it. */
-function render(key: string, build: () => VoxelGrid | undefined, width: number, height: number, fill: number, background = '#2c3266', portrait = false): string | undefined {
+function render(key: string, build: () => VoxelGrid | undefined, width: number, height: number, fill: number, background = '#cfe8ff', portrait = false): string | undefined {
   const hit = cache.get(key);
   if (hit) return hit;
   const view = viewFor(width, height, background);
@@ -65,7 +65,7 @@ export function planeSnapshot(modelId: string, livery: Element = 'neutre'): stri
 }
 
 export function vipSnapshot(id: string): string | undefined {
-  return render(`vip:${id}`, () => (VIP_LOOKS[id] ? buildVipModel(id) : undefined), 96, 96, 0.95, '#3a4180', true);
+  return render(`vip:${id}`, () => (VIP_LOOKS[id] ? buildVipModel(id) : undefined), 96, 96, 0.95, '#e6dcff', true);
 }
 
 export function shopSnapshot(defId: string): string | undefined {
@@ -75,5 +75,5 @@ export function shopSnapshot(defId: string): string | undefined {
 
 /** Portrait of Capucine, the guide of the journal and banners. */
 export function guideSnapshot(): string | undefined {
-  return render('guide', () => buildFigure(GUIDE_LOOK), 96, 96, 0.95, '#2b2a1a', true);
+  return render('guide', () => buildFigure(GUIDE_LOOK), 96, 96, 0.95, '#ffe089', true);
 }

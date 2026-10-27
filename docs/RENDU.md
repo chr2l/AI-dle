@@ -33,3 +33,7 @@ Les couleurs sont écrites en sRGB et converties en linéaire à la cuisson (`sr
 - `src/render/airport.ts` : `AirportScene` gère les avions garés (rangée sur le tarmac), les décollages et les atterrissages (`flightPose`) quand un vol part ou revient dans `GameState`, et un trafic d'ambiance de temps en temps. Effets : poussière au roulage, bouffée au décollage, fumée au toucher, traînées, ombre qui rétrécit avec l'altitude, petit rebond à l'atterrissage, feux d'approche, oiseaux, voitures, nuages.
 - `TowerView` appelle `airport.tick()` à 30 images/s (rien quand la vue est cachée) et `airport.sync()` à chaque `update(state)`.
 - Aperçu : `/preview.html?country=givrebourg` (un avion décolle après 1 s).
+
+## Horizon
+
+`src/render/models/horizon.ts` (`buildHorizon(element)`) prolonge le décor jusqu'au bord de l'écran : un sol de dalles de 8 unités sur ±900 autour de l'aéroport (couleurs du thème, lacs au-delà de 170, routes prolongées), puis un anneau voxel à l'échelle 2 avec reliefs propres à chaque thème (montagnes, mesas, volcans, collines de nuages…), villes, collines et bois. Un brouillard couleur ciel (`towerView.ts`, ancré sur le point visé par la caméra) fond l'horizon. Reconstruit par `Airport.setTheme`.
