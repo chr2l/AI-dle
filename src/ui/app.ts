@@ -26,6 +26,8 @@ import { RUNWAY_STOP, TowerView, setTowerFps } from './towerView';
 import { iconize } from './icons';
 import { replaceGame, saveGame } from './persist';
 import { NOTIF_KINDS, askPermission, cancelReminders, scheduleReminders } from './notify';
+import { music } from './music';
+import { featuredCountry } from '../core/destinations';
 import { TELEMETRY_URL, flush, problemReport, track, watchErrors } from './telemetry';
 import { Capacitor } from '@capacitor/core';
 import { applySettings, onSettings, reducedMotion, setSetting, settings, type Settings } from './settings';
@@ -160,7 +162,12 @@ export class App {
     onSettings((st) => {
       applySettings();
       setTowerFps(st.fps);
+      if (st.music) music.start();
+      else music.stop();
     });
+    music.setCountry(featuredCountry(Date.now()));
+    // Browsers only allow sound after a first touch.
+    root.addEventListener('pointerdown', () => music.start(), { once: true });
     this.lastLevel = state.level;
     this.lastMission = state.missionIndex;
     // Open during the first steps, folded afterwards unless the player chose.
@@ -248,12 +255,15 @@ export class App {
     window.addEventListener('pagehide', () => saveGame(this.state));
     document.addEventListener('visibilitychange', () => {
       if (document.hidden) {
+        music.stop();
         saveGame(this.state);
         void scheduleReminders(this.state);
         track('session_end', { sec: Math.round((Date.now() - this.sessionStart) / 1000), lvl: this.state.level });
         void flush();
       } else {
         this.sessionStart = Date.now();
+        music.setCountry(featuredCountry(Date.now()));
+        music.start();
         void cancelReminders();
         track('session_start', this.summary());
       }
@@ -356,14 +366,36 @@ export class App {
   }
 
   showOffline(off: G.TickResult) {
-    if (off.seconds < 60 || off.coins < 1) return;
+    if (off.seconds < 60 || (off.coins < 1 && !off.flightsLanded)) return;
     this.offline = off;
+    track('return', { min: Math.round(off.seconds / 60), coins: Math.round(off.coins) });
     this.sheet = () =>
       sheetHead('Bon retour !', `Absent ${dur(off.seconds * 1000)}`) +
-      `<div class="reward-big">+${fmt(off.coins)} 🪙</div><p class="center">Vos magasins ont continué de vendre${off.flightsLanded ? ` et ${off.flightsLanded} avion(s) sont rentrés : allez les récupérer dans Vols` : ''}.</p>` +
-      (off.doubled ? '' : button({ act: 'doubleOffline', label: '📺 Doubler les gains', sub: 'Regarder une pub', kind: 'ad', wide: true })) +
+      (off.coins >= 1 ? `<div class="reward-big">+${fmt(off.coins)} 🪙</div><p class="center">Vos magasins ont continué de vendre.</p>` : '') +
+      (off.doubled || off.coins < 1 ? '' : button({ act: 'doubleOffline', label: '📺 Doubler les gains', sub: 'Regarder une pub', kind: 'ad', wide: true })) +
+      this.waiting() +
       button({ act: 'close', label: 'Continuer', kind: 'ghost', wide: true });
     this.render();
+  }
+
+  /** « Ce qui vous attend » on the return screen, each line with its shortcut. */
+  private waiting(): string {
+    const s = this.state;
+    const now = this.now;
+    const open = unlocked(s);
+    const rows: string[] = [];
+    const row = (text: string, btn: string) => rows.push(`<div class="todo"><span class="grow">${text}</span>${btn}</div>`);
+    const go = (tab: Tab, view?: string) => button({ act: 'tab', args: view ? [tab, view] : [tab], label: 'Y aller', small: true });
+    const landed = G.landedPlanes(s, now).length;
+    if (landed) row(`🛬 <b>${landed}</b> avion(s) rentré(s)`, s.level >= G.COLLECT_ALL_LEVEL ? button({ act: 'collectAll', label: 'Tout récupérer', small: true, kind: 'main' }) : go('vols', 'departs'));
+    const pending = s.reports.filter((r) => r.pending).length;
+    if (pending) row(`⚠️ <b>${pending}</b> incident(s) de vol à trancher`, go('vols'));
+    const empty = G.emptyFloors(s).length;
+    if (empty) row(`📦 <b>${empty}</b> rayon(s) vide(s)`, s.level >= G.RESTOCK_ALL_LEVEL && empty >= 2 ? button({ act: 'restockAllAsk', label: 'Tout remplir', small: true, kind: 'main' }) : go('tour'));
+    if (s.vips.length) row(`🛎️ <b>${s.vips.length}</b> VIP dans le hall`, go('tour'));
+    if (open.has('objectifs') && G.dailyStatus(s, now).available) row('🎁 Cadeau du jour à ouvrir', go('objectifs'));
+    if (open.has('equipe') && (s.cooldowns.free_recruit ?? 0) <= now && s.crew.length < G.MAX_CREW) row('🧑‍✈️ Recrue gratuite prête', go('equipe'));
+    return rows.length ? `<h3>Ce qui vous attend</h3><div class="todos">${rows.join('')}</div>` : '';
   }
 
   private openHelp(key: string) {
@@ -534,18 +566,19 @@ export class App {
         break;
       case 'openShop': {
         const res = G.openShop(s, a[0], a[1]);
-        if (res.ok) {
-          this.toast(`Nouveau magasin : ${SHOP_BY_ID[res.value].emoji} ${SHOP_BY_ID[res.value].name} (${RARITY_INFO[SHOP_BY_ID[res.value].rarity].name})`, 'ok');
-          this.sheet = () => this.floorSheet(a[0]);
-        } else this.toast(res.error, 'err');
+        if (res.ok) this.revealShop(a[0], res.value);
+        else this.toast(res.error, 'err');
         break;
       }
       case 'placePlan':
         if (this.check(G.placePlan(s, a[0], a[1]), 'Plan installé')) this.sheet = () => this.floorSheet(a[1]);
         break;
-      case 'reroll':
-        this.check(G.rerollShop(s, a[0], a[1]), 'Nouveau tirage 🎲');
+      case 'reroll': {
+        const res = G.rerollShop(s, a[0], a[1]);
+        if (res.ok) this.revealShop(a[0], res.value);
+        else this.toast(res.error, 'err');
         break;
+      }
       case 'restock':
         if (this.check(G.restock(s, a[0], a[1], now), 'Commande passée 📦')) this.closeSheet();
         break;
@@ -666,6 +699,32 @@ export class App {
         if (res.ok) {
           if (!res.value.pending) this.float(`+${fmt(res.value.coins + res.value.vipCoins)} 🪙`);
           this.showReport(res.value.id);
+        } else this.toast(res.error, 'err');
+        break;
+      }
+      case 'collectAll': {
+        const res = G.collectAll(s, now);
+        if (!res.ok) {
+          this.toast(res.error, 'err');
+          break;
+        }
+        const coins = res.value.filter((r) => !r.pending).reduce((sum, r) => sum + r.coins + r.vipCoins, 0);
+        if (coins) this.float(`+${fmt(coins)} 🪙`);
+        const choice = res.value.find((r) => r.pending);
+        if (choice) this.showReport(choice.id);
+        else this.toast(`${res.value.length} avions récupérés`, 'ok');
+        track('collect_all', { n: res.value.length });
+        break;
+      }
+      case 'restockAllAsk':
+        this.sheet = () => this.restockAllSheet();
+        break;
+      case 'restockAll': {
+        const res = G.restockAll(s, a[0], now);
+        if (res.ok) {
+          this.closeSheet();
+          this.toast(`${res.value} rayons en livraison 🚚`, 'ok');
+          track('restock_all', { n: res.value, tier: a[0] });
         } else this.toast(res.error, 'err');
         break;
       }
@@ -845,6 +904,7 @@ export class App {
     return (
       sheetHead('⚙ Réglages') +
       `<h3>Confort</h3>` +
+      row('Musique', 'Une ambiance par pays de la semaine, très discrète.', 'music', [[true, 'Activée'], [false, 'Coupée']]) +
       row('Sons', 'Effets sonores des boutons et des gains.', 'sound', [[true, 'Activés'], [false, 'Coupés']]) +
       row('Vibrations', 'Petites vibrations au toucher et aux récompenses.', 'haptics', [[true, 'Activées'], [false, 'Coupées']]) +
       row('Animations', 'Pièces volantes, confettis, transitions. « Auto » suit le réglage du téléphone.', 'motion', [['auto', 'Auto'], ['full', 'Toutes'], ['reduced', 'Réduites']]) +
@@ -1195,6 +1255,8 @@ export class App {
         const free = G.freeBoxReadyAt(s) <= now;
         html += button({ act: 'boxes', label: '🎁 Boîtes', sub: free ? 'Une gratuite !' : `${s.plans.length} plan(s)`, small: true, kind: free ? 'ad' : undefined, tuto: 'boxes' });
       }
+      const empty = G.emptyFloors(s).length;
+      if (empty >= 2) html += button({ act: 'restockAllAsk', label: `📦 Tout réapprovisionner`, sub: `${empty} rayons vides`, small: true, why: s.level < G.RESTOCK_ALL_LEVEL ? `Se débloque au niveau ${G.RESTOCK_ALL_LEVEL}.` : false });
       if (s.level >= G.FRANCHISE_LEVEL) html += button({ act: 'franchiseAsk', label: '🌟 Franchise', sub: `+${G.pendingStars(s)} ⭐`, small: true });
       else if (open.has('franchise')) html += button({ act: 'franchiseAsk', label: '🌟 Franchise', sub: `Niveau ${G.FRANCHISE_LEVEL}`, small: true, why: `Se débloque au niveau ${G.FRANCHISE_LEVEL}.` });
       return html + '</div></div>';
@@ -1327,6 +1389,26 @@ export class App {
     }).join('');
   }
 
+  /** Shop draw with a short suspense: dice, then the shop in its rarity glow (plan de polish IP-12). */
+  private revealShop(floor: number, defId: string) {
+    const d = SHOP_BY_ID[defId];
+    const rar = RARITY_INFO[d.rarity];
+    const rare = d.rarity === 'E' || d.rarity === 'L';
+    sound('whoosh');
+    setTimeout(() => {
+      sound(rare ? 'levelup' : 'success');
+      haptic('success');
+      if (d.rarity === 'L') setTimeout(() => haptic('success'), 180);
+      if (d.rarity !== 'C') this.burst();
+    }, 550);
+    track('draw', { r: d.rarity });
+    this.sheet = () =>
+      sheetHead(`🎲 Étage ${floor + 1}`) +
+      `<div class="reveal r${d.rarity}" style="--rc:${rar.color}"><div class="rbox">🎲</div><div class="rshop">${shopPic(d.id, 'xl')}</div>` +
+      `<small class="rar" style="--rc:${rar.color}">${rar.name}</small><h2>${esc(d.name)}</h2><p>${CATEGORIES[d.category].name} · ouvre ses rayons dès la première commande.</p></div>` +
+      button({ act: 'floor', args: [floor], label: 'Voir l’étage', kind: 'main', wide: true, tuto: 'restock' });
+  }
+
   private boxResult(boxId: G.BoxId, r: { defId: string; rarity: G.Rarity; duplicate: boolean; pity: boolean }): string {
     const s = this.state;
     const d = SHOP_BY_ID[r.defId];
@@ -1428,6 +1510,7 @@ export class App {
     if (pending.length) {
       html += pending.map((r) => `<button class="alert" data-act="showReport" data-args='["${r.id}"]'>${EVENT_BY_ID[r.event!.defId].emoji} Incident au retour de ${esc(r.destName)} : touchez pour décider</button>`).join('');
     }
+    if (landed >= 2) html += this.collectAllBtn();
     if (this.volsView === 'avions') return html + this.fleet(now);
     if (this.volsView === 'departs') return html + this.departures(now);
     if (this.volsView === 'pays') return html + this.countries(now);
@@ -1445,6 +1528,20 @@ export class App {
         `</div></section>`,
     );
     return `<div class="fleet">${pages.join('')}</div>`;
+  }
+
+  private collectAllBtn(): string {
+    const n = G.landedPlanes(this.state, this.now).length;
+    return button({ act: 'collectAll', label: `📥 Tout récupérer (${n} avions)`, kind: 'main', wide: true, why: this.state.level < G.COLLECT_ALL_LEVEL ? `Se débloque au niveau ${G.COLLECT_ALL_LEVEL}.` : false });
+  }
+
+  private restockAllSheet(): string {
+    const n = G.emptyFloors(this.state).length;
+    return sheetHead('📦 Tout réapprovisionner', `${n} rayons vides · même taille de commande pour tous`) +
+      RESTOCK_TIERS.map((t, k) =>
+        button({ act: 'restockAll', args: [k], label: `${['📦', '📦📦', '🚚'][k]} ${['Petite', 'Moyenne', 'Grosse'][k]} commande`, sub: `Livré en ${dur(t.restockSec * 1000)} · vend pendant ${dur(t.durationSec * 1000)}`, wide: true, kind: k === 2 ? 'main' : undefined }),
+      ).join('') +
+      `<p class="sub center">Avant de partir longtemps, la grosse commande garde les magasins ouverts.</p>`;
   }
 
   private departures(now: number): string {

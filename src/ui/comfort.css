@@ -41,3 +41,8 @@ button .c, .jhint, #tabs button { font-size: 13px; }
 .ftue .pulse:not(#tabs button)::after { content: '👆'; position: absolute; right: 6px; bottom: -18px; font-size: 28px; pointer-events: none; animation: point 1.1s ease-in-out infinite; filter: drop-shadow(0 2px 2px #0008); z-index: 5; }
 .ftue #tabs button.pulse::after { content: '👇'; position: absolute; left: 50%; top: -30px; margin-left: -14px; font-size: 26px; pointer-events: none; animation: point 1.1s ease-in-out infinite; }
 @keyframes point { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
+
+/* --- Return screen: what is waiting (plan de polish IP-15) ----------------- */
+.todos { display: grid; gap: 6px; margin-bottom: 10px; }
+.todo { display: flex; align-items: center; gap: 10px; padding: 6px 6px 6px 12px; background: #ffffff0d; border-radius: 12px; font-weight: 700; }
+.todo button { flex: none; }
