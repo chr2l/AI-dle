@@ -29,12 +29,12 @@ export function guideStep(s: GameState, now: number): GuideStep | null {
     case 'build3':
       return building
         ? { tab: 'tour', target: 'rush-build', text: 'Le chantier avance tout seul. Attendez la fin du chrono, ou finissez-le tout de suite avec des Miles ✈️.' }
-        : { tab: 'tour', target: 'build', text: 'Touchez « Construire » : chaque étage accueille un magasin qui rapporte des pièces 🪙.' };
+        : { tab: 'tour', target: 'build', text: 'Montez tout en haut (🏙️) et touchez « Construire » : chaque étage accueille un magasin.' };
     case 'shop':
       if (building) return { tab: 'tour', target: 'rush-build', text: 'Votre étage est en chantier. Dès qu’il est fini, vous pourrez y ouvrir un magasin.' };
-      return { tab: 'tour', target: 'open', text: 'Étage prêt ! Touchez l’étage vide, puis choisissez un type de magasin.' };
+      return { tab: 'tour', target: 'open', text: 'Étage prêt ! Touchez « Ouvrir un magasin » en bas de l’écran et choisissez un type de commerce.' };
     case 'restock':
-      return { tab: 'tour', target: 'restock', text: 'Rayons vides ! Touchez l’étage marqué ❗ et commandez un produit.' };
+      return { tab: 'tour', target: 'restock', text: 'Rayons vides ! Allez sur l’étage marqué ❗ (ascenseur à droite) et commandez un produit.' };
     case 'send':
       return idle(s).length
         ? { tab: 'vols', target: 'send', text: 'Des passagers 👥 attendent dans la salle d’embarquement. Touchez « Envoyer » et choisissez une destination.' }
@@ -50,7 +50,7 @@ export function guideStep(s: GameState, now: number): GuideStep | null {
     case 'upgrade':
       return { tab: 'vols', target: 'upgrade-plane', text: 'Améliorez une caractéristique de votre avion avec le bouton ⬆️ (vitesse, places, autonomie…).' };
     case 'shopup':
-      return { tab: 'tour', target: 'upgrade-shop', text: 'Touchez un magasin puis « Améliorer » : il vendra plus vite et rapportera plus.' };
+      return { tab: 'tour', target: 'upgrade-shop', text: 'Allez sur un magasin avec l’ascenseur et touchez « Améliorer » : il vendra plus vite.' };
     case 'research':
       return s.researching
         ? { tab: 'vols', view: 'recherche', target: 'rush-research', text: 'Recherche en cours : revenez à la fin du chrono.' }
@@ -58,7 +58,7 @@ export function guideStep(s: GameState, now: number): GuideStep | null {
     case 'ring2':
       return { tab: 'vols', target: 'send', text: 'Atteignez le niveau 4 puis envoyez un avion vers Gourmandie ou Bitopia.' };
     case 'fusion':
-      return { tab: 'tour', target: 'fusion', text: 'Touchez le Laboratoire et fusionnez deux magasins pour obtenir le plan d’un magasin plus rare.' };
+      return { tab: 'tour', target: 'fusion', text: 'Montez tout en haut (🏙️) et touchez « Fusion » pour obtenir le plan d’un magasin plus rare.' };
     case 'vip':
       return { tab: 'tour', text: 'Quand un VIP arrive dans le hall, emmenez-le dans le pays qu’il demande avec un avion assez confortable.' };
     default:
@@ -72,7 +72,8 @@ export function tabBadges(s: GameState, now: number): Record<Tab, number> {
     s.floors.filter((f) => f.shop && !f.shop.restock && f.shop.stock <= 1e-6).length +
     s.floors.filter((f) => f.buildEndsAt === undefined && !f.shop).length +
     (s.guide ? 1 : 0) +
-    s.vips.filter((v) => VIP_POWER(v.defId)).length;
+    s.vips.filter((v) => VIP_POWER(v.defId)).length +
+    (s.level >= 2 && G.freeBoxReadyAt(s) <= now ? 1 : 0);
   const vols =
     s.planes.filter((p) => p.flight && p.flight.endsAt <= now).length +
     s.reports.filter((r) => r.pending).length +
@@ -86,7 +87,8 @@ export function tabBadges(s: GameState, now: number): Record<Tab, number> {
   const chest = !s.quests.chestClaimed && s.quests.claimed.every(Boolean) ? 1 : 0;
   const achievements = G.achievementViews(s).filter((a) => a.done && !a.claimed).length;
   const season = G.seasonView(s, now)?.track.filter((t) => t.reached && !t.claimed).length ?? 0;
-  const objectifs = (mission?.done ? 1 : 0) + (daily.available ? 1 : 0) + quests + chest + achievements + season;
+  const dex = s.level >= 2 ? G.dexClaimable(s) : 0;
+  const objectifs = (mission?.done ? 1 : 0) + (daily.available ? 1 : 0) + quests + chest + achievements + season + dex;
   const last = s.social.lastWeek;
   const amis = last && !last.claimed ? 1 : 0;
   return { tour, vols, equipe, objectifs, amis };
@@ -107,6 +109,8 @@ export const FEATURES = {
   labo: { name: 'Laboratoire', icon: '🧪', text: 'Dans Tour : fusionnez deux magasins pour obtenir un magasin plus rare.', when: (s: GameState) => s.level >= G.FUSION_LEVEL },
   amis: { name: 'Amis', icon: '👋', text: 'Codes ami, cadeaux, visites et classement de la semaine.', when: (s: GameState) => s.level >= 3 },
   saison: { name: 'Événements', icon: '🎉', text: 'Dans Objectifs : les événements saisonniers et leurs récompenses exclusives.', when: (s: GameState) => s.level >= 2 },
+  boites: { name: 'Boîtes de plans', icon: '🎁', text: 'Dans Tour (🏙️ vue d’ensemble) : ouvrez des boîtes pour gagner des magasins plus ou moins rares, ou pariez sur la rareté d’un magasin neuf.', when: (s: GameState) => s.level >= 2 },
+  dex: { name: 'Dex', icon: '📖', text: 'Dans Objectifs : votre collection de magasins, VIP, avions, pays et événements, avec des Miles à chaque palier.', when: (s: GameState) => s.level >= 2 },
   franchise: { name: 'Franchise', icon: '🌟', text: 'Dans Tour : recommencez avec des étoiles de prestige qui augmentent tous vos gains.', when: (s: GameState) => s.level >= G.FRANCHISE_LEVEL - 2 },
 } as const;
 

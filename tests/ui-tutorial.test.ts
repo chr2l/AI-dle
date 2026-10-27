@@ -39,7 +39,7 @@ describe('progressive unlocking', () => {
     expect(unlocked(state)).toEqual(new Set(['objectifs', 'vols']));
     state.missionIndex = 0;
     state.level = 3;
-    expect(unlocked(state)).toEqual(new Set(['objectifs', 'vols', 'equipe', 'recherche', 'labo', 'amis', 'saison']));
+    expect(unlocked(state)).toEqual(new Set(['objectifs', 'vols', 'equipe', 'recherche', 'labo', 'amis', 'saison', 'boites', 'dex']));
     state.level = 10;
     expect(unlocked(state).has('franchise')).toBe(true);
   });

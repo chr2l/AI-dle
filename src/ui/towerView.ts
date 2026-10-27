@@ -1,8 +1,9 @@
-// Cube art view of the player's tower (src/render), above the Tour panel.
-// The tower is rebuilt only when its floors change; the airport around it
-// (scenery, planes taking off and landing, cars, clouds) animates every
-// frame. Drag scrolls the view.
-import { Color, Group } from 'three';
+// Cube art view of the player's tower (src/render), filling the Tour tab.
+// The player moves from floor to floor: floors above the focused one and the
+// roof are hidden so it can be seen, and the camera glides and zooms onto it.
+// The top stop shows the whole tower. The airport around it (scenery, planes
+// taking off and landing, cars, clouds) animates every frame.
+import { Color, Group, type Object3D } from 'three';
 import { SHOP_BY_ID } from '../core/data/shops';
 import { featuredCountry } from '../core/destinations';
 import type { GameState } from '../core';
@@ -13,28 +14,38 @@ import { buildTower, floorY } from '../render/tower';
 
 /** Animation frame rate cap, to spare mobile batteries. */
 const FPS = 30;
+/** Zoom (CSS pixels per voxel) on a single floor, and on the whole tower. */
+const ZOOM_FLOOR = 14;
+const ZOOM_OVERVIEW = 6;
 
 export class TowerView {
   private view: PixelRenderer;
   private content = new Group();
   private signature = '';
-  private scroll = 0;
-  private maxY = 0;
-  private followTop = true;
   private airport = new AirportScene();
   private lastFrame = 0;
+  private floorCount = 0;
+  /** 0 = hall, 1..n = floors, n + 1 = whole tower. */
+  focus = Infinity;
+  private camY = 0;
+  private zoom = ZOOM_OVERVIEW;
+  /** Called when a swipe moves to another floor, and on a tap (index = current focus). */
+  onFocus?: (index: number) => void;
+  onTap?: (index: number) => void;
 
   constructor(readonly canvas: HTMLCanvasElement) {
-    this.view = new PixelRenderer(canvas, { style: 'cube', pixelsPerVoxel: 6 });
+    this.view = new PixelRenderer(canvas, { style: 'cube', pixelsPerVoxel: ZOOM_OVERVIEW });
     this.view.scene.add(this.content);
     this.view.scene.add(this.airport.group);
-    let lastY: number | null = null;
-    canvas.addEventListener('pointerdown', (e) => (lastY = e.clientY));
-    addEventListener('pointerup', () => (lastY = null));
-    addEventListener('pointermove', (e) => {
-      if (lastY === null) return;
-      this.scrollBy((e.clientY - lastY) / this.view.pixelsPerVoxel);
-      lastY = e.clientY;
+    let start: { y: number; t: number } | null = null;
+    canvas.addEventListener('pointerdown', (e) => (start = { y: e.clientY, t: Date.now() }));
+    addEventListener('pointerup', (e) => {
+      if (!start) return;
+      const dy = e.clientY - start.y;
+      start = null;
+      if (Math.abs(dy) < 10) this.onTap?.(this.stop);
+      // Swipe up to climb, down to go back to the ground.
+      else if (Math.abs(dy) > 30) this.move(dy < 0 ? 1 : -1);
     });
     new ResizeObserver(() => this.resize()).observe(canvas);
     const loop = (now: number) => {
@@ -48,20 +59,51 @@ export class TowerView {
     requestAnimationFrame(loop);
   }
 
+  /** Current stop, clamped to the existing floors. */
+  get stop() {
+    return Math.max(0, Math.min(this.floorCount + 1, this.focus));
+  }
+
+  private move(delta: number) {
+    this.setFocus(this.stop + delta);
+    this.onFocus?.(this.stop);
+  }
+
+  setFocus(index: number) {
+    this.focus = Math.max(0, Math.min(this.floorCount + 1, index));
+    this.applyVisibility();
+  }
+
+  private applyVisibility() {
+    const stop = this.stop;
+    const overview = stop > this.floorCount;
+    const tower = this.content.children[0];
+    tower?.children.forEach((o: Object3D, i) => {
+      // Children: lobby (0), floors 1..n, roof (n + 1).
+      o.visible = overview || i <= stop;
+    });
+  }
+
   resize() {
     if (!this.canvas.clientWidth) return;
     this.view.resize(this.canvas.clientWidth, this.canvas.clientHeight);
     this.draw();
   }
 
-  private scrollBy(dy: number) {
-    this.scroll = Math.min(this.maxY, Math.max(0, this.scroll + dy));
-    this.followTop = this.scroll >= this.maxY - FLOOR.height;
-    this.draw();
-  }
-
   private draw() {
-    this.view.target.set(FLOOR.width / 2, this.scroll, FLOOR.depth / 2);
+    const stop = this.stop;
+    const overview = stop > this.floorCount;
+    const targetY = overview ? floorY(this.floorCount + 1) * 0.55 : floorY(stop) + FLOOR.height * 0.45;
+    const targetZoom = overview ? Math.min(ZOOM_OVERVIEW, (this.canvas.clientHeight * 0.8) / Math.max(30, floorY(this.floorCount + 2) * 1.1)) : ZOOM_FLOOR;
+    // Ease toward the target for a smooth elevator ride.
+    this.camY += (targetY - this.camY) * 0.18;
+    this.zoom += (targetZoom - this.zoom) * 0.18;
+    const { width, height } = this.view.artSize;
+    const halfW = width / this.zoom / 2;
+    const halfH = height / this.zoom / 2;
+    Object.assign(this.view.camera, { left: -halfW, right: halfW, top: halfH, bottom: -halfH });
+    this.view.camera.updateProjectionMatrix();
+    this.view.target.set(FLOOR.width / 2, this.camY, FLOOR.depth / 2);
     this.view.render();
   }
 
@@ -88,9 +130,8 @@ export class TowerView {
         ),
       ),
     );
-    this.maxY = floorY(state.floors.length + 1);
-    // Stay on the newest floor unless the player scrolled down on purpose.
-    if (this.followTop) this.scroll = Math.max(0, floorY(state.floors.length));
+    this.floorCount = state.floors.length;
+    this.applyVisibility();
     this.draw();
   }
 }
