@@ -447,7 +447,7 @@ Revendre l'aéroport pour en ouvrir un dans une nouvelle ville.
 - ✅ Rétention : cadeau quotidien, quêtes du jour, succès, album, pays de la semaine, notifications planifiées (§18)
 - ✅ Événements saisonniers à thème (§19) et social : amis, cadeaux, visites, classements (§20), côté moteur
 - ✅ Polish (plan IP-01 à IP-31) : sauvegarde blindée, Réglages, retour Android, rappels locaux, musique, boutique (boost, Pass), captures automatiques, workflow de release (docs/PLAY-STORE.md), scène qui réagit, jour et nuit, profil et photo, mode paysage
-- ⏳ Post-MVP : vrai serveur social, vrais SDK pubs/IAP (docs/MONETISATION.md), version anglaise
+- ⏳ Post-MVP : mise en ligne du serveur social (code prêt), vrais SDK pubs/IAP (docs/MONETISATION.md)
 
 ## 18. Durée de vie et rétention
 
@@ -531,7 +531,7 @@ Neuf événements à thème par an, aux mêmes dates pour tous (UTC). Un seul à
 
 ## 20. Social
 
-Le moteur reste jouable hors ligne : tout passe par une interface `SocialBackend` (publier son profil, lire ceux des amis, livrer et récupérer les cadeaux, top mondial). `MemorySocialBackend` sert au développement et aux tests ; un vrai serveur (Firebase, Supabase ou un Worker) s'y branchera sans toucher au moteur.
+Le moteur reste jouable hors ligne : tout passe par une interface `SocialBackend` (publier son profil, lire ceux des amis, livrer et récupérer les cadeaux, top mondial). `MemorySocialBackend` sert au développement et aux tests ; le vrai serveur est un Cloudflare Worker avec une base D1 (`server/social`, déploiement dans son README), branché par `HttpSocialBackend` (src/ui/socialServer.ts) quand le build connaît `VITE_SOCIAL_URL`. Chaque téléphone tire une clé secrète gardée dans la sauvegarde ; le serveur n'en garde que l'empreinte, ce qui empêche de publier sous le code d'un autre ou de prendre ses cadeaux. Le jeu se synchronise au lancement, toutes les 5 minutes et à l'ouverture de l'onglet Amis : profil publié, cadeaux reçus ouverts (au-delà de 10 par jour ils repartent au serveur pour le lendemain), profils des amis rafraîchis.
 
 ### 20.1 Profil et code ami
 - Chaque joueur a un **code ami** stable tiré de sa graine (`IP-XXXX-XXXX`, sans 0/O/1/I) et un nom (2 à 20 caractères, modifiable).

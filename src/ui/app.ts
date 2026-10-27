@@ -12,7 +12,7 @@ import { MAX_STAT_LEVEL, MODULE_BY_ID, MODULES, PLANE_BY_ID, PLANE_MODELS, STAT_
 import { CATEGORIES, CATEGORY_IDS, RARITY_INFO, RESTOCK_TIERS, SHOP_BY_ID } from '../core/data/shops';
 import { VIP_BY_ID } from '../core/data/vips';
 import type { SeasonReward } from '../core/data/seasons';
-import type { CrewMember, CrewRole, Destination, GameState, PlaneState, StatKey } from '../core';
+import type { CrewMember, CrewRole, Destination, GameState, PlaneState, PublicProfile, StatKey } from '../core';
 import { HELP } from './help';
 import { guideSnapshot, planeSnapshot, shopSnapshot, vipSnapshot } from './snapshot';
 import '@fontsource/nunito/latin-600.css';
@@ -35,6 +35,7 @@ import { applySettings, onSettings, reducedMotion, setSetting, settings, type Se
 import { confetti, flyTo, haptic, sound } from './fx';
 import { FEATURES, guideStep, isTabOpen, tabBadges, unlocked, type Feature, type Tab } from './tutorial';
 import { currentLang } from '../i18n';
+import { HttpSocialBackend, SOCIAL_URL, socialKey } from './socialServer';
 import { bar, button, chip, dec, dur, esc, fmt, lack, morph, perSec, pips, section, sheetHead, timerBar } from './widgets';
 
 export { dur, fmt } from './widgets';
@@ -132,10 +133,12 @@ export class App {
   /** Features already announced (see FEATURES). */
   private known: Set<Feature>;
   private offline?: G.TickResult;
-  /** Local stand-in until a social server exists: friend codes cannot be found yet. */
-  private social: G.SocialBackend = new G.MemorySocialBackend();
+  /** The social server when one is configured, else a local stand-in where friend codes can't be found. */
+  private social: G.SocialBackend;
+  private socialAt = 0;
 
   constructor(private state: GameState, private root: HTMLElement) {
+    this.social = SOCIAL_URL ? new HttpSocialBackend(SOCIAL_URL, () => socialKey(this.state)) : new G.MemorySocialBackend();
     root.innerHTML =
       `<header id="hud"></header><div id="guide"></div>` +
       `<div id="tower"><canvas></canvas><div id="journal"></div><div id="lift"></div><div id="bubble"></div></div>` +
@@ -200,6 +203,7 @@ export class App {
     const tabs = TABS.map((t) => t.id);
     const forward = tabs.indexOf(tab) > tabs.indexOf(this.tab);
     this.tab = tab;
+    if (tab === 'amis' && Date.now() - this.socialAt > 30_000) void this.syncSocial();
     const p = this.root.querySelector<HTMLElement>('#panel')!;
     p.classList.remove('from-left', 'from-right');
     void p.offsetWidth;
@@ -247,13 +251,14 @@ export class App {
       console.warn('Rendu 3D indisponible', e);
       this.root.querySelector<HTMLElement>('#tower canvas')!.remove();
     }
-    void this.social.publish(G.publicProfile(this.state, Date.now()));
+    void this.syncSocial();
     // Simulation 4 times a second (plan de polish IP-20); the coin counter still rolls every frame.
     let simAt = 0;
     const frame = () => {
       const now = Date.now();
       if (now - simAt >= 250) {
         simAt = now;
+        if (now - this.socialAt > 300_000) void this.syncSocial();
         const tick = G.update(this.state, now);
         // Back from the background (frames stop while hidden): show what happened.
         if (tick.seconds >= 60 && !this.sheetLocked) {
@@ -933,7 +938,7 @@ export class App {
       case 'gift': {
         const res = G.sendGift(s, a[0], now);
         if (res.ok) {
-          void this.social.deliverGift(res.value);
+          this.social.deliverGift(res.value).catch(() => this.toast('Cadeau non envoyé : pas de connexion au serveur.', 'err'));
           this.toast('Cadeau envoyé 🎁', 'ok');
         } else this.toast(res.error, 'err');
         break;
@@ -2041,9 +2046,41 @@ export class App {
 
   // --- Amis ------------------------------------------------------------------
 
+  /**
+   * Publishes our profile, opens the gifts waiting on the server and
+   * refreshes the friends' profiles. At start, every 5 minutes and on the
+   * Amis tab; silent when offline.
+   */
+  private async syncSocial() {
+    const now = Date.now();
+    this.socialAt = now;
+    try {
+      await this.social.publish(G.publicProfile(this.state, now));
+      const res = G.openGifts(this.state, await this.social.takeGifts(this.state.social.code), now);
+      // Beyond the daily limit, gifts go back to the server for tomorrow.
+      for (const g of res.kept) await this.social.deliverGift(g);
+      if (res.opened.length) {
+        const names = [...new Set(res.opened.map((g) => g.fromName))].join(', ');
+        this.toast(`🎁 ${res.opened.length} cadeau(x) de ${names} : +${fmt(res.coins)} 🪙`, 'ok');
+      }
+      const codes = this.state.social.friends.map((f) => f.code);
+      if (codes.length) G.refreshFriends(this.state, await this.social.fetchProfiles(codes));
+      saveGame(this.state);
+      this.render();
+    } catch {
+      /* offline: next time */
+    }
+  }
+
   private async addFriend(code: string) {
-    const [profile] = await this.social.fetchProfiles([G.normalizeCode(code)]);
-    if (!profile) this.toast('Joueur introuvable : le serveur social n’est pas encore en ligne.', 'err');
+    let profile: PublicProfile | undefined;
+    try {
+      [profile] = await this.social.fetchProfiles([G.normalizeCode(code)]);
+    } catch {
+      this.toast('Pas de connexion au serveur social : réessayez plus tard.', 'err');
+      return;
+    }
+    if (!profile) this.toast(SOCIAL_URL ? 'Joueur introuvable : vérifiez le code.' : 'Joueur introuvable : le serveur social n’est pas encore en ligne.', 'err');
     else this.check(G.addFriend(this.state, profile, Date.now()), `${profile.name} ajouté !`);
     saveGame(this.state);
     this.render();
@@ -2072,7 +2109,7 @@ export class App {
     return html + `<p class="note">Récompense le lundi selon votre rang : 1ᵉʳ 30 ✈️, 2ᵉ 20 ✈️, 3ᵉ 10 ✈️, les autres 5 ✈️.</p>`;
     }
     html += section(`👋 Amis ${s.social.friends.length}/${G.MAX_FRIENDS}`);
-    if (!s.social.friends.length) html += '<p class="note">Échangez vos codes ami pour vous envoyer un cadeau par jour et visiter vos aéroports. Le serveur social arrive bientôt : pour l’instant aucun code ne peut être trouvé.</p>';
+    if (!s.social.friends.length) html += '<p class="note">Échangez vos codes ami pour vous envoyer un cadeau par jour et visiter vos aéroports.' + (SOCIAL_URL ? '' : ' Le serveur social arrive bientôt : pour l’instant aucun code ne peut être trouvé.') + '</p>';
     for (const f of s.social.friends) {
       const giftDone = s.social.gifts.day === G.dayIndex(now) && s.social.gifts.sent.includes(f.code);
       const visitDone = s.social.visits.day === G.dayIndex(now) && s.social.visits.codes.includes(f.code);

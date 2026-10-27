@@ -1,4 +1,5 @@
 // Short explanations behind every ⓘ button and HUD counter.
+import { SOCIAL_URL } from './socialServer';
 
 export const HELP: Record<string, { title: string; body: string[] }> = {
   welcome: {
@@ -33,6 +34,6 @@ export const HELP: Record<string, { title: string; body: string[] }> = {
   quests: { title: '📅 Quêtes du jour', body: ['3 nouvelles quêtes chaque jour. Validez les 3 pour ouvrir le coffre bonus.'] },
   season: { title: '🎉 Événement saisonnier', body: ['Pendant l’événement, chaque vol rapporte des points ; les vols vers le pays de l’événement en donnent deux fois plus.', 'Récupérez les paliers avant la fin.'] },
   achievements: { title: '🏆 Succès', body: ['Des objectifs à long terme qui rapportent des Miles.'] },
-  social: { title: '👋 Amis', body: ['Échangez vos codes ami pour vous envoyer un cadeau par jour et visiter vos aéroports (petit bonus de pièces).', 'Le classement de la semaine compare les pièces gagnées ; le podium rapporte des Miles le lundi.', 'Le serveur social n’est pas encore en ligne : aucun code ne peut être trouvé pour l’instant.'] },
-  privacy: { title: '🔒 Confidentialité', body: ['Votre partie est enregistrée uniquement sur ce téléphone. Aucune donnée personnelle n’est envoyée ni partagée pour l’instant.', 'Les publicités et achats sont simulés : rien n’est facturé.', 'Si cela change (amis en ligne, statistiques anonymes), le jeu vous demandera votre accord avant.'] },
+  social: { title: '👋 Amis', body: ['Échangez vos codes ami pour vous envoyer un cadeau par jour et visiter vos aéroports (petit bonus de pièces).', 'Le classement de la semaine compare les pièces gagnées ; le podium rapporte des Miles le lundi.', SOCIAL_URL ? 'Votre nom, votre niveau et l’aperçu de votre tour sont visibles par les joueurs qui ont votre code.' : 'Le serveur social n’est pas encore en ligne : aucun code ne peut être trouvé pour l’instant.'] },
+  privacy: { title: '🔒 Confidentialité', body: [SOCIAL_URL ? 'Votre partie est enregistrée sur ce téléphone. Pour les amis, le serveur social reçoit votre code ami, votre nom de joueur, votre niveau et l’aperçu de votre tour : rien d’autre.' : 'Votre partie est enregistrée uniquement sur ce téléphone. Aucune donnée personnelle n’est envoyée ni partagée pour l’instant.', 'Les publicités et achats sont simulés : rien n’est facturé.', 'Si cela change (amis en ligne, statistiques anonymes), le jeu vous demandera votre accord avant.'] },
 };
