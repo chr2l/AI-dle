@@ -35,6 +35,8 @@ jobs:
         run: |
           [ -d android ] || npx cap add android
           npx cap sync android
+      - name: Icônes de l'application
+        run: cp -r resources/android/res/. android/app/src/main/res/
       - name: Gradle assembleDebug
         working-directory: android
         run: |

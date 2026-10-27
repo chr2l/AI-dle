@@ -3,6 +3,7 @@
  * shops from every country, a floor under construction and the plane fleet.
  * Query params: ?style=cube|pixel&seed=3&floors=8&scale=3&ppv=10
  * &country=tropicalia themes the airport scenery (default: neutral land).
+ * ?scene=icon draws the app icon (&bg=RRGGBB background).
  * ?scene=vips shows the VIP line-up instead (&vips=rockeur,diva to pick some).
  */
 import { COUNTRIES } from '../core/data/countries';
@@ -14,9 +15,10 @@ import { FLOOR } from './models/floor';
 import { VIP_SIZE } from './models/vip';
 import { pick, rng } from './palette';
 import { PixelRenderer } from './pixelRenderer';
-import { buildTower, buildVipLineup, floorY, VIP_SPACING } from './tower';
+import { buildTower, buildVipLineup, floorY, meshFromGrid, VIP_SPACING } from './tower';
 import { AirportScene } from './airport';
-import { Color } from 'three';
+import { Color, Group } from 'three';
+import { buildIconPlaneModel, buildIconTowerModel } from './models/icon';
 
 const params = new URLSearchParams(location.search);
 const seed = Number(params.get('seed') ?? 1);
@@ -31,11 +33,23 @@ const view = new PixelRenderer(canvas, {
 });
 
 const vipScene = params.get('scene') === 'vips';
+const iconScene = params.get('scene') === 'icon';
 let center: () => void;
 let scroll = 0;
 let maxY = 0;
 
-if (vipScene) {
+if (iconScene) {
+  // App icon, rendered on a flat background (&bg=000000) so the alpha can be recovered.
+  view.scene.background = new Color(`#${params.get('bg') ?? '8fd3ff'}`);
+  view.scene.add(meshFromGrid(buildIconTowerModel()));
+  const plane = new Group();
+  const mesh = meshFromGrid(buildIconPlaneModel());
+  plane.add(mesh);
+  plane.rotation.set(0, Math.PI / 2, 0.35, 'YXZ');
+  plane.position.set(15, 22, 9);
+  view.scene.add(plane);
+  center = () => view.target.set(9, 11, 7.5);
+} else if (vipScene) {
   const ids = params.get('vips')?.split(',') ?? VIPS.map((v) => v.id);
   const lineup = buildVipLineup(ids, 3);
   view.scene.add(lineup.group);
