@@ -23,6 +23,7 @@ import './style.css';
 import './comfort.css';
 import { App as NativeApp } from '@capacitor/app';
 import { RUNWAY_STOP, TowerView, setTowerFps } from './towerView';
+import { framePhoto, sharePhoto } from './photo';
 import { iconize } from './icons';
 import { replaceGame, saveGame } from './persist';
 import { NOTIF_KINDS, askPermission, cancelReminders, scheduleReminders } from './notify';
@@ -44,6 +45,9 @@ const TABS: { id: Tab; icon: string; name: string }[] = [
   { id: 'objectifs', icon: '🎯', name: 'Objectifs' },
   { id: 'amis', icon: '👋', name: 'Amis' },
 ];
+
+/** Two-column layout: scene on the left, panel on the right (matches comfort.css). */
+const WIDE = matchMedia('(min-width: 700px) and (orientation: landscape)');
 
 type VolsView = 'avions' | 'departs' | 'pays' | 'recherche';
 
@@ -157,6 +161,7 @@ export class App {
     addEventListener('pointerup', () => (this.pointerDown = false));
     addEventListener('pointercancel', () => (this.pointerDown = false));
     this.swipeTabs();
+    WIDE.addEventListener('change', () => this.render());
     this.lastCoins = state.coins;
     this.shownCoins = state.coins;
     onSettings((st) => {
@@ -232,6 +237,11 @@ export class App {
       this.tower.onTap = (stop) => {
         if (stop >= 1 && stop <= this.state.floors.length) this.run('floor', [stop - 1]);
       };
+      this.tower.onDrop = (index) => {
+        sound('coin');
+        haptic('medium');
+        this.towerFloat(index, '', 'puff');
+      };
     } catch (e) {
       console.warn('Rendu 3D indisponible', e);
       this.root.querySelector<HTMLElement>('#tower canvas')!.remove();
@@ -248,8 +258,10 @@ export class App {
       requestAnimationFrame(frame);
     };
     requestAnimationFrame(frame);
+    let second = 0;
     setInterval(() => {
       if (!this.pointerDown) this.render();
+      if (++second % 3 === 0) this.salesFloaters();
     }, 1000);
     setInterval(() => saveGame(this.state), 10_000);
     window.addEventListener('pagehide', () => saveGame(this.state));
@@ -306,6 +318,31 @@ export class App {
     this.render();
   }
 
+  /** Text rising from a floor of the tower view (sales « +12 🪙 », dust when a floor lands). */
+  private towerFloat(index: number, text: string, cls = 'tfloat') {
+    const at = this.tower?.floorPoint(index);
+    const layer = this.root.querySelector<HTMLElement>('#tower');
+    if (!at || !layer || reducedMotion()) return;
+    const el = document.createElement('div');
+    el.className = cls;
+    el.innerHTML = iconize(esc(text));
+    el.style.left = `${at.x}px`;
+    el.style.top = `${at.y}px`;
+    layer.appendChild(el);
+    setTimeout(() => el.remove(), 1400);
+  }
+
+  /** Every few seconds, selling floors in view show what they earned (plan de polish IP-11). */
+  private salesFloaters() {
+    if (this.tab !== 'tour' || this.sheet || document.hidden) return;
+    const s = this.state;
+    const boost = (s.boosts.coinsX2Until ?? 0) > this.now ? 2 : 1;
+    const selling = s.floors.flatMap((f, i) => (f.shop && f.shop.stock > 0 ? [i] : []));
+    const stop = this.tower?.stop ?? Infinity;
+    const shown = stop >= 1 && stop <= s.floors.length ? selling.filter((i) => i === stop - 1) : selling.sort(() => Math.random() - 0.5).slice(0, 2);
+    for (const i of shown) this.towerFloat(i + 1, `+${fmt(G.shopRate(s, i) * boost * 3)} 🪙`);
+  }
+
   /** HUD coin counter: follows the real amount, easing over big gains. */
   private rollCoins() {
     const target = this.state.coins;
@@ -331,7 +368,7 @@ export class App {
       haptic('error');
     } else if (kind === 'ok') {
       sound('success');
-      haptic('success');
+      haptic('medium');
     }
     clearTimeout(this.toastTimer);
     this.toastTimer = window.setTimeout(() => (el.hidden = true), kind === 'err' ? 3200 : 2400);
@@ -441,6 +478,12 @@ export class App {
         break;
       case 'settings':
         this.sheet = () => this.settingsSheet();
+        break;
+      case 'profile':
+        this.sheet = () => this.profileSheet();
+        break;
+      case 'photo':
+        void this.takePhoto();
         break;
       case 'set':
         setSetting(a[0] as keyof Settings, a[1] as never);
@@ -615,7 +658,7 @@ export class App {
         else {
           const r = res.value;
           sound(r.rarity === 'E' || r.rarity === 'L' ? 'levelup' : 'success');
-          haptic('success');
+          haptic(r.rarity === 'L' ? 'heavy' : r.rarity === 'E' ? 'success' : 'medium');
           if (r.rarity !== 'C') setTimeout(() => this.burst(), 450);
           this.sheet = () => this.boxResult(a[0], r);
         }
@@ -688,7 +731,10 @@ export class App {
         break;
       case 'send': {
         const vips = s.vips.filter((v) => v.demand?.countryId === a[1].countryId).map((v) => v.uid);
-        if (this.check(G.sendFlight(s, a[0], a[1], now, vips), vips.length ? `Décollage avec ${vips.length} VIP !` : 'Décollage ! 🛫')) this.closeSheet();
+        if (this.check(G.sendFlight(s, a[0], a[1], now, vips), vips.length ? `Décollage avec ${vips.length} VIP !` : 'Décollage ! 🛫')) {
+          this.closeSheet();
+          this.tower?.shake(500);
+        }
         break;
       }
       case 'tailwind':
@@ -919,6 +965,7 @@ export class App {
       row('Vibrations', 'Petites vibrations au toucher et aux récompenses.', 'haptics', [[true, 'Activées'], [false, 'Coupées']]) +
       row('Animations', 'Pièces volantes, confettis, transitions. « Auto » suit le réglage du téléphone.', 'motion', [['auto', 'Auto'], ['full', 'Toutes'], ['reduced', 'Réduites']]) +
       row('Taille du texte', 'Agrandit les panneaux et les fenêtres.', 'text', [['normal', 'Normale'], ['large', 'Grande']]) +
+      row('Couleurs', 'Palette lisible pour les daltoniens (raretés, états).', 'palette', [['normal', 'Standard'], ['cvd', 'Daltonien']]) +
       row('Fluidité de la vue', '60 images par seconde : plus doux, use plus la batterie.', 'fps', [[30, '30 i/s'], [60, '60 i/s']]) +
       `<h3>Rappels</h3>` +
       row('Notifications', 'Avion rentré, rayon vide, cadeau du jour… Jamais entre 22 h et 8 h.', 'notif', [[true, 'Activées'], [false, 'Coupées']]) +
@@ -934,6 +981,36 @@ export class App {
       button({ act: 'resetAsk', label: 'Recommencer de zéro', sub: 'Efface toute la partie', kind: 'ghost', wide: true }) +
       `<p class="sub center">IdlePort ${__APP_VERSION__}</p>`
     );
+  }
+
+  /** Profile: level, career statistics and the airport photo (plan de polish IP-23, IP-28). */
+  private profileSheet(): string {
+    const s = this.state;
+    const xpNeed = G.xpToNext(s.level);
+    const lines = G.careerLines(s, this.now);
+    return (
+      sheetHead(`👤 ${esc(s.social.name)}`, `Code ami ${esc(s.social.code)}`) +
+      `<div class="card"><b>⭐ Niveau ${s.level}</b>${bar(s.xp / xpNeed, 'xp')}<small>${fmt(s.xp)}/${fmt(xpNeed)} XP · chaque dépense et chaque vol en rapporte. Monter ouvre des étages, des avions et des pays.</small></div>` +
+      `<h3>Carrière</h3><div class="career">${lines.map((l) => `<div><span>${l.icon}</span><b>${l.coins ? fmt(l.value) : l.value.toLocaleString('fr-FR')}</b><small>${l.label}</small></div>`).join('')}</div>` +
+      (this.tower ? button({ act: 'photo', label: '📷 Photo de mon aéroport', sub: 'À partager avec vos amis', kind: 'main', wide: true }) : '') +
+      button({ act: 'close', label: 'Fermer', kind: 'ghost', wide: true })
+    );
+  }
+
+  private async takePhoto() {
+    if (!this.tower) return;
+    this.closeSheet();
+    this.goTab('tour');
+    this.render();
+    // Let the panel settle and the camera finish its glide.
+    await new Promise((r) => setTimeout(r, 450));
+    try {
+      const png = await framePhoto(this.tower.snapshot(), { name: this.state.social.name, level: this.state.level, floors: this.state.floors.length });
+      track('photo');
+      if (!(await sharePhoto(png))) this.toast('Partage annulé.');
+    } catch {
+      this.toast('La photo n’a pas pu être prise.', 'err');
+    }
   }
 
   private pendingImport: GameState | null = null;
@@ -1007,13 +1084,15 @@ export class App {
     ).join(''));
 
     const towerBox = this.root.querySelector<HTMLElement>('#tower')!;
-    towerBox.hidden = this.tab !== 'tour';
+    // Tablet or landscape: the tower stays on the left of every tab (plan de polish IP-30).
+    const tour = this.tab === 'tour';
+    towerBox.hidden = !tour && !WIDE.matches;
     if (!towerBox.hidden) {
       this.tower?.update(s);
-      morph(this.root.querySelector('#journal')!, this.journal(now, step));
-      morph(this.root.querySelector('#lift')!, this.lift(now));
-      morph(this.root.querySelector('#bubble')!, this.bubble(now));
-      this.tower?.setFocus(this.floorStop);
+      morph(this.root.querySelector('#journal')!, tour ? this.journal(now, step) : '');
+      morph(this.root.querySelector('#lift')!, tour ? this.lift(now) : '');
+      morph(this.root.querySelector('#bubble')!, tour ? this.bubble(now) : '');
+      if (tour) this.tower?.setFocus(this.floorStop);
     }
 
     const panel = this.root.querySelector<HTMLElement>('#panel')!;
@@ -1058,7 +1137,7 @@ export class App {
     const center = { x: innerWidth / 2, y: innerHeight / 3 };
     if (s.level > this.lastLevel) {
       sound('levelup');
-      haptic('success');
+      haptic('heavy');
       confetti(fx, center, 40);
       const el = document.createElement('div');
       el.className = 'levelup';
@@ -1117,7 +1196,7 @@ export class App {
       (s.missionIndex >= 1 || s.level >= 2 ? res('miles', '✈️', String(s.miles), 'Miles') : '') +
       (s.missionIndex >= 3 || s.level >= 2 ? res('lounge', '👥', `${Math.floor(s.lounge.passengers)}/${G.loungeCap(s)}`, 'Passagers') : '') +
       `<button class="gear" data-act="settings" aria-label="Réglages">⚙</button></div>` +
-      `<button class="lvl" data-act="help" data-args='["level"]'><b>⭐ Niv. ${s.level}</b>${bar(s.xp / xpNeed, 'xp')}<small>${fmt(s.xp)}/${fmt(xpNeed)} XP</small></button>`);
+      `<button class="lvl" data-act="profile" aria-label="Profil"><b>⭐ Niv. ${s.level}</b>${bar(s.xp / xpNeed, 'xp')}<small>${fmt(s.xp)}/${fmt(xpNeed)} XP</small></button>`);
   }
 
   /** Mission journal laid over the tower view. */
@@ -1407,8 +1486,8 @@ export class App {
     sound('whoosh');
     setTimeout(() => {
       sound(rare ? 'levelup' : 'success');
-      haptic('success');
-      if (d.rarity === 'L') setTimeout(() => haptic('success'), 180);
+      haptic(d.rarity === 'L' ? 'heavy' : rare ? 'success' : 'medium');
+      if (d.rarity === 'L') setTimeout(() => haptic('heavy'), 180);
       if (d.rarity !== 'C') this.burst();
     }, 550);
     track('draw', { r: d.rarity });

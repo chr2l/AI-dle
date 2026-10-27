@@ -11,6 +11,7 @@ import i_bell_ringing from '@phosphor-icons/core/assets/fill/bell-ringing-fill.s
 import i_book_open from '@phosphor-icons/core/assets/fill/book-open-fill.svg?raw';
 import i_buildings from '@phosphor-icons/core/assets/fill/buildings-fill.svg?raw';
 import i_calendar_check from '@phosphor-icons/core/assets/fill/calendar-check-fill.svg?raw';
+import i_camera from '@phosphor-icons/core/assets/fill/camera-fill.svg?raw';
 import i_chart_bar from '@phosphor-icons/core/assets/fill/chart-bar-fill.svg?raw';
 import i_check_circle from '@phosphor-icons/core/assets/fill/check-circle-fill.svg?raw';
 import i_city from '@phosphor-icons/core/assets/fill/city-fill.svg?raw';
@@ -149,6 +150,7 @@ const ICONS: [string, string][] = [
   ['📤', svg(i_tray_arrow_up, '')],
   ['⚙', svg(i_gear_six, '')],
   ['❓', svg(i_question, '')],
+  ['📷', svg(i_camera, '')],
   ['⏱', svg(i_timer, '')],
   ['🪪', svg(i_identification_card, '')],
   ['🥇', svg(i_medal, 'gold')],

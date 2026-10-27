@@ -47,11 +47,17 @@ export function sound(name: keyof typeof SOUNDS) {
   }
 }
 
-export function haptic(kind: 'light' | 'success' | 'error' = 'light') {
+/**
+ * Vibrations graded by importance (plan de polish IP-21): light for a tap,
+ * medium for a purchase or a takeoff, heavy for a level or a Legendary.
+ */
+export type HapticKind = 'light' | 'medium' | 'heavy' | 'success' | 'error';
+
+export function haptic(kind: HapticKind = 'light') {
   if (!settings.haptics) return;
   try {
-    if (kind === 'light') void Haptics.impact({ style: ImpactStyle.Light }).catch(() => {});
-    else void Haptics.notification({ type: kind === 'success' ? NotificationType.Success : NotificationType.Error }).catch(() => {});
+    if (kind === 'success' || kind === 'error') void Haptics.notification({ type: kind === 'success' ? NotificationType.Success : NotificationType.Error }).catch(() => {});
+    else void Haptics.impact({ style: kind === 'heavy' ? ImpactStyle.Heavy : kind === 'medium' ? ImpactStyle.Medium : ImpactStyle.Light }).catch(() => {});
   } catch {
     /* no haptics */
   }

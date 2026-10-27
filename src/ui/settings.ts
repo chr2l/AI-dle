@@ -1,6 +1,8 @@
 // Player preferences (Réglages): sound, vibrations, animations, text size,
 // frame rate. Stored apart from the game save so a fresh start or an
 // imported game keeps them.
+import { RARITY_INFO } from '../core/data/shops';
+import type { Rarity } from '../core/types';
 const KEY = 'idleport.settings';
 /** Mute flag from before the settings screen existed. */
 const OLD_MUTE_KEY = 'idleport.mute';
@@ -14,6 +16,8 @@ export interface Settings {
   motion: 'auto' | 'reduced' | 'full';
   text: 'normal' | 'large';
   fps: 30 | 60;
+  /** Colors told apart with any color vision (plan de polish IP-29). */
+  palette: 'normal' | 'cvd';
   /** Reminders (local notifications) on, and the kinds the player turned off. */
   notif: boolean;
   notifOff: string[];
@@ -24,7 +28,7 @@ export interface Settings {
   installId?: string;
 }
 
-const DEFAULTS: Settings = { sound: true, music: true, haptics: true, motion: 'auto', text: 'normal', fps: 30, notif: true, notifOff: [], notifAsked: false, analytics: 'unknown' };
+const DEFAULTS: Settings = { sound: true, music: true, haptics: true, motion: 'auto', text: 'normal', fps: 30, palette: 'normal', notif: true, notifOff: [], notifAsked: false, analytics: 'unknown' };
 
 function read(): Settings {
   try {
@@ -65,8 +69,15 @@ export function reducedMotion(): boolean {
   }
 }
 
-/** Reflects the settings on the document (CSS hooks: .calm, data-text). */
+/** Okabe-Ito colors for rarities: distinct for every kind of color blindness. */
+export const CVD_RARITY: Record<Rarity, string> = { C: '#c8c8c8', R: '#56b4e9', E: '#d55e00', L: '#f0e442' };
+const BASE_RARITY = Object.fromEntries(Object.entries(RARITY_INFO).map(([r, v]) => [r, v.color])) as Record<Rarity, string>;
+
+/** Reflects the settings on the document (CSS hooks: .calm, data-text, data-palette). */
 export function applySettings(root = document.documentElement) {
   root.classList.toggle('calm', reducedMotion());
   root.dataset.text = settings.text;
+  root.dataset.palette = settings.palette;
+  // Rarity colors are display only: the whole interface reads them from RARITY_INFO.
+  for (const r of Object.keys(RARITY_INFO) as Rarity[]) RARITY_INFO[r].color = settings.palette === 'cvd' ? CVD_RARITY[r] : BASE_RARITY[r];
 }
