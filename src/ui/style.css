@@ -373,3 +373,30 @@ span.rar, small.rar { display: inline-block; padding: 2px 9px; border-radius: 99
 .reveal.rL .rshop { animation: pop .5s .55s both, glow 1.6s 1.1s ease-in-out 2; }
 @keyframes boxopen { 0% { transform: scale(1); } 15%, 45% { transform: rotate(-8deg) scale(1.05); } 30%, 60% { transform: rotate(8deg) scale(1.05); } 80% { transform: scale(1.3); opacity: 1; } 100% { transform: scale(1.6); opacity: 0; } }
 @keyframes glow { 50% { filter: drop-shadow(0 0 34px var(--rc)) brightness(1.2); } }
+
+/* --- Icons (icons.ts) and cube art portraits (snapshot.ts) ------------------------- */
+svg.ic { width: 1.2em; height: 1.2em; vertical-align: -0.22em; fill: currentColor; flex: none; filter: drop-shadow(0 1.5px 0 #0007); }
+.ic-gold { color: #ffc61a; }
+.ic-sky { color: #6cc4ff; }
+.ic-green { color: #3fd68f; }
+.ic-orange { color: #ff8a66; }
+.ic-red { color: #ff5d6c; }
+.ic-pink { color: #ff7ac8; }
+.ic-violet { color: #b98bff; }
+.ic-teal { color: #3fd6c9; }
+.ic-tan { color: #e0a86b; }
+.ic-silver { color: #c8cde0; }
+.ic-bronze { color: #d48a4f; }
+button.main svg.ic, button.ok svg.ic { filter: none; }
+button.main .ic-gold { color: #8a5a00; }
+img.pic { display: inline-block; width: 1.5em; height: 1.5em; vertical-align: -0.4em; object-fit: cover; border-radius: 7px; background: #2c3266; box-shadow: 0 2px 0 #0007; image-rendering: auto; }
+img.pic.vip { object-fit: contain; border-radius: 50%; }
+img.pic.lg { width: 2.2em; height: 2.2em; border-radius: 10px; }
+img.pic.vip.lg { border-radius: 50%; }
+img.pic.xl { width: 120px; height: 96px; border-radius: 16px; }
+img.pic.plane.lg { width: 3em; height: 1.7em; object-fit: contain; }
+.dexe .de img.pic.lg { width: 64px; height: 52px; }
+.dexe .de img.pic.vip.lg { width: 52px; height: 52px; }
+.dexe .de img.pic.plane.lg { width: 76px; height: 42px; }
+.bub.vipb img.pic { width: 40px; height: 40px; }
+.dexicon svg.ic, .boxicon svg.ic { width: 1em; height: 1em; }

@@ -14,13 +14,14 @@ import { VIP_BY_ID } from '../core/data/vips';
 import type { SeasonReward } from '../core/data/seasons';
 import type { CrewMember, CrewRole, Destination, GameState, PlaneState, StatKey } from '../core';
 import { HELP } from './help';
-import { planeSnapshot } from './planeSnapshot';
+import { planeSnapshot, shopSnapshot, vipSnapshot } from './snapshot';
 import '@fontsource/nunito/latin-600.css';
 import '@fontsource/nunito/latin-700.css';
 import '@fontsource/nunito/latin-800.css';
 import '@fontsource/lilita-one/latin-400.css';
 import './style.css';
-import { TowerView } from './towerView';
+import { RUNWAY_STOP, TowerView } from './towerView';
+import { iconize } from './icons';
 import { confetti, flyTo, haptic, isMuted, sound, toggleMute } from './fx';
 import { FEATURES, guideStep, isTabOpen, tabBadges, unlocked, type Feature, type Tab } from './tutorial';
 import { bar, button, chip, dur, esc, fmt, lack, morph, pips, section, sheetHead, timerBar } from './widgets';
@@ -221,7 +222,7 @@ export class App {
 
   toast(text: string, kind: 'ok' | 'err' | 'info' = 'info') {
     const el = this.root.querySelector<HTMLElement>('#toast')!;
-    el.textContent = text;
+    el.innerHTML = iconize(esc(text));
     el.className = kind;
     el.hidden = false;
     if (kind === 'err') {
@@ -239,7 +240,7 @@ export class App {
   private float(text: string) {
     const el = document.createElement('div');
     el.className = 'float';
-    el.textContent = text;
+    el.innerHTML = iconize(esc(text));
     el.style.left = `${Math.min(innerWidth - 60, Math.max(60, this.pointer.x))}px`;
     el.style.top = `${this.pointer.y - 20}px`;
     const fx = this.root.querySelector<HTMLElement>('#fx')!;
@@ -530,6 +531,12 @@ export class App {
       case 'upgradePlane':
         if (this.check(G.upgradePlane(s, a[0], a[1]), `${STAT_INFO[a[1] as StatKey].name} améliorée !`)) this.flashKey(`stat-${a[0]}-${a[1]}`);
         break;
+      case 'planeGo':
+        this.goTab('vols');
+        this.volsView = 'avions';
+        this.render();
+        requestAnimationFrame(() => this.root.querySelector(`[data-plane="${a[0]}"]`)?.scrollIntoView({ block: 'start' }));
+        return;
       case 'jumpPlane':
         this.root.querySelector(`[data-plane="${a[0]}"]`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
         return;
@@ -723,7 +730,7 @@ export class App {
     modal.hidden = !this.sheet;
     if (this.sheet) {
       const html = this.sheet();
-      if (wasHidden || this.sheetFresh) modal.innerHTML = `<div class="card rise">${html}</div>`;
+      if (wasHidden || this.sheetFresh) modal.innerHTML = iconize(`<div class="card rise">${html}</div>`);
       else morph(modal.querySelector('.card')!, html);
       this.sheetFresh = false;
     }
@@ -753,7 +760,7 @@ export class App {
       confetti(fx, center, 40);
       const el = document.createElement('div');
       el.className = 'levelup';
-      el.innerHTML = `<small>Niveau supérieur !</small><b>⭐ ${s.level}</b>`;
+      el.innerHTML = iconize(`<small>Niveau supérieur !</small><b>⭐ ${s.level}</b>`);
       fx.append(el);
       setTimeout(() => el.remove(), 2200);
     }
@@ -833,17 +840,17 @@ export class App {
     const name = esc(def.name);
     if (shop.restock) {
       const t = RESTOCK_TIERS[shop.restock.tier];
-      return { icon: def.emoji, name, sub: `📦 Livraison dans ${dur(shop.restock.endsAt - now)}`, mark: 'wait', tuto: '', color, bar: timerBar(shop.restock.endsAt, t.restockSec * 1000, now, 'blue') };
+      return { icon: shopPic(def.id), name, sub: `📦 Livraison dans ${dur(shop.restock.endsAt - now)}`, mark: 'wait', tuto: '', color, bar: timerBar(shop.restock.endsAt, t.restockSec * 1000, now, 'blue') };
     }
     if (shop.stock > 1e-6) {
       const up = shop.level < G.MAX_SHOP_LEVEL ? G.shopUpgradeCost(def.rarity, shop.level) : Infinity;
-      return { icon: def.emoji, name, sub: `${rate.toFixed(1)} 🪙/s · stock pour ${dur((shop.stock / rate) * 1000)}`, mark: s.coins >= up ? 'can' : '', tuto: 'upgrade-shop', color, bar: '' };
+      return { icon: shopPic(def.id), name, sub: `${rate.toFixed(1)} 🪙/s · stock pour ${dur((shop.stock / rate) * 1000)}`, mark: s.coins >= up ? 'can' : '', tuto: 'upgrade-shop', color, bar: '' };
     }
-    return { icon: def.emoji, name, sub: '<span class="warn">Rayons vides !</span>', mark: 'need', tuto: 'restock', color, bar: '' };
+    return { icon: shopPic(def.id), name, sub: '<span class="warn">Rayons vides !</span>', mark: 'need', tuto: 'restock', color, bar: '' };
   }
 
   private get floorStop() {
-    return Math.max(0, Math.min(this.state.floors.length + 1, this.stopAt));
+    return Math.max(RUNWAY_STOP, Math.min(this.state.floors.length + 1, this.stopAt));
   }
 
   /** Lift panel on the side of the view: one button per stop, top to bottom. */
@@ -862,6 +869,9 @@ export class App {
       html += btn(i + 1, `<span>${i + 1}</span>`, s.guide?.floor === i + 1 ? 'lost' : st.mark, st.tuto);
     }
     html += btn(0, '🛎️', s.vips.length ? 'vip' : '');
+    const landed = s.planes.some((p) => p.flight && p.flight.endsAt <= now);
+    const ready = s.lounge.passengers >= 1 && s.planes.some((p) => !p.flight && !p.damaged);
+    html += btn(RUNWAY_STOP, '🛫', landed ? 'can' : ready ? 'need' : '');
     return html;
   }
 
@@ -870,8 +880,12 @@ export class App {
     const s = this.state;
     const stop = this.floorStop;
     const n = s.floors.length;
+    if (stop === RUNWAY_STOP) {
+      const landed = s.planes.filter((p) => p.flight && p.flight.endsAt <= now);
+      return landed.length ? `<button class="bub can" data-act="planeGo" data-args='["${landed[0].uid}"]'>🧳 ${landed.length} avion(s) à décharger</button>` : '';
+    }
     if (stop === 0) {
-      return s.vips.map((v) => `<button class="bub vipb" data-act="vip" data-args='["${v.uid}"]'>${VIP_BY_ID[v.defId].emoji}<small>${VIP_BY_ID[v.defId].power ? '⚡' : COUNTRY_BY_ID[v.demand!.countryId].emoji}</small></button>`).join('') +
+      return s.vips.map((v) => `<button class="bub vipb" data-act="vip" data-args='["${v.uid}"]'>${vipPic(v.defId)}<small>${VIP_BY_ID[v.defId].power ? '⚡' : COUNTRY_BY_ID[v.demand!.countryId].emoji}</small></button>`).join('') +
         (s.guide ? `<span class="bub info">🧍 étage ${s.guide.floor} ?</span>` : '');
     }
     if (stop > n) return s.level >= 2 && G.freeBoxReadyAt(s) <= now ? `<button class="bub can" data-act="boxes">🎁 Caisse gratuite</button>` : '';
@@ -888,10 +902,15 @@ export class App {
     const stop = this.floorStop;
     const n = s.floors.length;
     const nav = (title: string, sub: string) =>
-      `<div class="dock-head"><button class="nav" data-act="goFloor" data-args="[${stop - 1}]"${stop <= 0 ? ' disabled' : ''} aria-label="Descendre">▼</button>` +
+      `<div class="dock-head"><button class="nav" data-act="goFloor" data-args="[${stop - 1}]"${stop <= RUNWAY_STOP ? ' disabled' : ''} aria-label="Descendre">▼</button>` +
       `<div class="grow"><b>${title}</b><small>${sub}</small></div>` +
       `<button class="nav" data-act="goFloor" data-args="[${stop + 1}]"${stop > n ? ' disabled' : ''} aria-label="Monter">▲</button></div>`;
 
+    if (stop === RUNWAY_STOP) {
+      const landed = s.planes.filter((p) => p.flight && p.flight.endsAt <= now).length;
+      return nav('🛫 Piste', `${s.planes.filter((p) => p.flight && p.flight.endsAt > now).length} en vol · ${landed} rentré(s) · ${Math.floor(s.lounge.passengers)} passagers au hall`) +
+        `<div class="dock-body board mini">${this.boardRows(now, 'planeGo')}</div>`;
+    }
     if (stop === 0) {
       const cap = G.loungeCap(s);
       const upCost = G.loungeUpgradeCost(s.lounge.level);
@@ -915,7 +934,7 @@ export class App {
       if (open.has('labo')) {
         const f = s.fusion;
         html += f
-          ? button({ act: 'help', args: ['lab'], label: `🧪 ${SHOP_BY_ID[f.a].emoji}+${SHOP_BY_ID[f.b].emoji}`, sub: dur(f.endsAt - now), small: true }) + this.rushBtn({ kind: 'fusion' }, now)
+          ? button({ act: 'help', args: ['lab'], label: `🧪 ${shopPic(f.a)}+${shopPic(f.b)}`, sub: dur(f.endsAt - now), small: true }) + this.rushBtn({ kind: 'fusion' }, now)
           : button({ act: 'fusionPick', args: [null], label: '🧪 Fusion', sub: `${s.plans.length} plan(s)`, small: true, tuto: 'fusion' });
       }
       if (open.has('boites')) {
@@ -965,13 +984,13 @@ export class App {
     if (!shop) {
       return sheetHead(`Étage ${i + 1} · vide`, 'Choisissez un type de magasin : le magasin exact est tiré au sort parmi ce type (plus ou moins rare).') +
         `<div class="grid">${CATEGORY_IDS.map((c) => button({ act: 'openShop', args: [i, c], label: `${CATEGORIES[c].emoji} ${CATEGORIES[c].name}`, sub: CATEGORIES[c].products.join(', '), tuto: 'open' })).join('')}</div>` +
-        (s.plans.length ? `<h3>📜 Vos plans</h3><p class="sub">Installez directement un magasin gagné (boîte, laboratoire, saison).</p><div class="grid">${s.plans.map((id, k) => button({ act: 'placePlan', args: [k, i], label: `${SHOP_BY_ID[id].emoji} ${esc(SHOP_BY_ID[id].name)}`, sub: RARITY_INFO[SHOP_BY_ID[id].rarity].name })).join('')}</div>` : '') +
+        (s.plans.length ? `<h3>📜 Vos plans</h3><p class="sub">Installez directement un magasin gagné (boîte, laboratoire, saison).</p><div class="grid">${s.plans.map((id, k) => button({ act: 'placePlan', args: [k, i], label: `${shopPic(id)} ${esc(SHOP_BY_ID[id].name)}`, sub: RARITY_INFO[SHOP_BY_ID[id].rarity].name })).join('')}</div>` : '') +
         guide;
     }
     const def = SHOP_BY_ID[shop.defId];
     const rate = G.shopRate(s, i);
     const r = RARITY_INFO[def.rarity];
-    let html = sheetHead(`${def.emoji} ${esc(def.name)}`, `Étage ${i + 1} · ${CATEGORIES[def.category].name}`) +
+    let html = sheetHead(`${shopPic(def.id, 'lg')} ${esc(def.name)}`, `Étage ${i + 1} · ${CATEGORIES[def.category].name}`) +
       `<div class="chips">${chip(r.name, 'rar" style="--rc:' + r.color)}${chip(`Niv. ${shop.level}/${G.MAX_SHOP_LEVEL}`)}${chip('★'.repeat(shop.stars) || '☆')}${chip(`${rate.toFixed(1)} 🪙/s`)}</div>`;
     const bet = G.rarityBetView(s, i);
     if (bet) {
@@ -1050,7 +1069,7 @@ export class App {
         : same >= 0
           ? button({ act: 'planStar', args: [k, same], label: `★ Étoile · étage ${same + 1}`, small: true, kind: 'main' })
           : chip('Construisez un étage');
-      return `<div class="card"><div class="line"><span class="dexicon">${d.emoji}</span><div class="grow"><b>${esc(d.name)}</b><small style="color:${r.color}">${r.name} · ${CATEGORIES[d.category].name}</small></div>${act}</div></div>`;
+      return `<div class="card"><div class="line"><span class="dexicon">${shopPic(d.id, 'lg')}</span><div class="grow"><b>${esc(d.name)}</b><small style="color:${r.color}">${r.name} · ${CATEGORIES[d.category].name}</small></div>${act}</div></div>`;
     }).join('');
   }
 
@@ -1073,7 +1092,7 @@ export class App {
       : same >= 0
         ? button({ act: 'planStar', args: [k, same], label: `★ Étoile sur l’étage ${same + 1}`, kind: 'main' })
         : '';
-    return sheetHead(`${box.emoji} ${esc(box.name)}`) + `<div class="reveal r${r.rarity}" style="--rc:${rar.color}"><div class="rbox">${box.emoji}</div><div class="rshop">${d.emoji}</div>` +
+    return sheetHead(`${box.emoji} ${esc(box.name)}`) + `<div class="reveal r${r.rarity}" style="--rc:${rar.color}"><div class="rbox">${box.emoji}</div><div class="rshop">${shopPic(d.id, 'xl')}</div>` +
       `<small class="rar" style="--rc:${rar.color}">${rar.name}${r.pity ? ' · garanti 🍀' : ''}</small><h2>${esc(d.name)}</h2>` +
       `<p>${r.duplicate ? 'Déjà dans votre Dex : utilisez ce plan comme étoile ★ sur le même magasin.' : '✨ Nouveau dans votre Dex !'}</p></div>` +
       `<div class="btns">${use}${again}</div>` + button({ act: 'boxes', label: 'Retour aux boîtes', kind: 'ghost', wide: true });
@@ -1096,7 +1115,7 @@ export class App {
     html += `<div class="dexgrid">${cur.entries.map((e) => {
       const color = e.rarity ? RARITY_INFO[e.rarity].color : '';
       return e.seen
-        ? `<div class="dexe" style="${color ? `--rc:${color}` : ''}"><span class="de">${e.emoji}</span><b>${esc(e.name)}</b>${e.count ? `<i class="dc">×${e.count}</i>` : ''}</div>`
+        ? `<div class="dexe" style="${color ? `--rc:${color}` : ''}"><span class="de">${cur.id === 'shops' ? shopPic(e.id, 'lg') : cur.id === 'vips' ? vipPic(e.id, 'lg') : cur.id === 'planes' ? planePic(e.id) : e.emoji}</span><b>${esc(e.name)}</b>${e.count ? `<i class="dc">×${e.count}</i>` : ''}</div>`
         : `<div class="dexe unseen"><span class="de">?</span><b>???</b>${e.hint ? `<small>${esc(e.hint)}</small>` : ''}</div>`;
     }).join('')}</div>`;
     return html;
@@ -1107,7 +1126,7 @@ export class App {
     const v = s.vips.find((x) => x.uid === uid);
     if (!v) return sheetHead('VIP parti') + '<p>Ce VIP a quitté le hall.</p>' + button({ act: 'close', label: 'Fermer', wide: true });
     const def = VIP_BY_ID[v.defId];
-    let html = sheetHead(`${def.emoji} ${esc(def.name)}`, `Part dans ${dur(v.expiresAt - this.now)}`) + `<p class="quote">« ${esc(def.line)} »</p>`;
+    let html = sheetHead(`${vipPic(def.id, 'lg')} ${esc(def.name)}`, `Part dans ${dur(v.expiresAt - this.now)}`) + `<p class="quote">« ${esc(def.line)} »</p>`;
     if (def.power) html += button({ act: 'useVip', args: [uid], label: '⚡ Utiliser son pouvoir', kind: 'main', wide: true });
     if (v.demand) {
       const c = COUNTRY_BY_ID[v.demand.countryId];
@@ -1128,8 +1147,8 @@ export class App {
       `<div class="grid">${shops.map(({ f, i }) => {
         const d = SHOP_BY_ID[f.shop!.defId];
         return first === null
-          ? button({ act: 'fusionPick', args: [i], label: `${d.emoji} ${esc(d.name)}`, sub: `Étage ${i + 1} · ${RARITY_INFO[d.rarity].name}` })
-          : button({ act: 'fusion', args: [first, i], label: `${d.emoji} ${esc(d.name)}`, sub: `${fmt(cost(i))} 🪙 · ${dur(G.fusionDuration(RARITY_INFO[a!.rarity].rank, RARITY_INFO[d.rarity].rank) * 1000)}`, why: lack(s.coins, cost(i), 'pièces 🪙') });
+          ? button({ act: 'fusionPick', args: [i], label: `${shopPic(d.id)} ${esc(d.name)}`, sub: `Étage ${i + 1} · ${RARITY_INFO[d.rarity].name}` })
+          : button({ act: 'fusion', args: [first, i], label: `${shopPic(d.id)} ${esc(d.name)}`, sub: `${fmt(cost(i))} 🪙 · ${dur(G.fusionDuration(RARITY_INFO[a!.rarity].rank, RARITY_INFO[d.rarity].rank) * 1000)}`, why: lack(s.coins, cost(i), 'pièces 🪙') });
       }).join('')}</div>`;
   }
 
@@ -1160,8 +1179,15 @@ export class App {
         button({ act: 'shop', label: 'Voir les avions', kind: 'main', wide: true, why: full ? `Hangar plein (${s.planes.length}/${G.hangarSize(s.level)}). Il s’agrandit tous les 3 niveaux.` : false }) +
         `</div></section>`,
     );
-    // Departure board: every plane at a glance, touch a row to open its card.
-    const rows = s.planes.map((p) => {
+    const rows = this.boardRows(now, 'jumpPlane');
+    const board = `<div class="board"><div class="bhead"><b>🛫 Départs et arrivées</b><span>👥 ${Math.floor(s.lounge.passengers)} en attente <button class="info" data-act="help" data-args='["fleet"]'>ⓘ</button></span></div>${rows}</div>`;
+    return board + `<div class="fleet">${pages.join('')}</div>`;
+  }
+
+  /** Departure board: every plane at a glance, touch a row to open its card. */
+  private boardRows(now: number, act: string): string {
+    const s = this.state;
+    return s.planes.map((p) => {
       let state: string;
       let route: string;
       if (p.flight) {
@@ -1177,10 +1203,8 @@ export class App {
         state = '<span class="st idle">Au sol</span>';
         route = '<small>Prêt à embarquer</small>';
       }
-      return `<button class="brow" data-act="jumpPlane" data-args='["${p.uid}"]'><b style="--pc:${p.color}">${esc(p.name)}</b><div class="grow">${route}</div>${state}</button>`;
+      return `<button class="brow" data-act="${act}" data-args='["${p.uid}"]'><b style="--pc:${p.color}">${esc(p.name)}</b><div class="grow">${route}</div>${state}</button>`;
     }).join('');
-    const board = `<div class="board"><div class="bhead"><b>🛫 Départs et arrivées</b><span>👥 ${Math.floor(s.lounge.passengers)} en attente <button class="info" data-act="help" data-args='["fleet"]'>ⓘ</button></span></div>${rows}</div>`;
-    return board + `<div class="fleet">${pages.join('')}</div>`;
   }
 
   /** Little route line from the airport to a country with the plane on it. */
@@ -1317,7 +1341,7 @@ export class App {
         return `<div class="dest"><div class="grow"><b>${esc(d.name)}</b><div class="chips">${chip(`${d.distance} km`)}${chip(`⏱ ${dur(G.flightDuration(d.distance, st.speed) * 1000)}`)}${d.modifier !== 'calme' ? chip(mod.name, d.modifier) : ''}</div>` +
           `<small>≈ +${fmt(coins)} 🪙 · +${fmt(res)} ${c.resource.emoji}</small></div>${button({ act: 'send', args: [planeUid, d], label: '🛫', sub: 'Décoller', kind: 'main', small: true, why })}</div>`;
       });
-      const vipNote = vips.length ? `<small class="vipnote">${vips.map((v) => VIP_BY_ID[v.defId].emoji).join(' ')} ${vips.length} VIP veut y aller (confort ≥ ${Math.max(...vips.map((v) => v.demand!.minComfort))})</small>` : '';
+      const vipNote = vips.length ? `<small class="vipnote">${vips.map((v) => vipPic(v.defId)).join('')} ${vips.length} VIP veut y aller (confort ≥ ${Math.max(...vips.map((v) => v.demand!.minComfort))})</small>` : '';
       return `<div class="country"><div class="chead"><b>${c.emoji} ${c.name}</b>${c.id === featured ? chip('À la une ×1,5', 'gold') : ''}<small>${c.resource.emoji} ${c.resource.name}</small></div>${vipNote}${rows.join('')}</div>`;
     });
     return sheetHead(`🛫 Où envoyer ${esc(plane.name)} ?`, `${pax} passagers à bord · autonomie ${Math.floor(st.range)} km · confort ${st.comfort.toFixed(1)}`) + groups.join('') +
@@ -1344,7 +1368,7 @@ export class App {
       else if (r.event!.outcome) html += `<p class="note">${esc(r.event!.outcome.text)}</p>`;
     }
     html += `<div class="rewards"><span>🪙<b>+${fmt(r.coins + r.vipCoins)}</b></span><span>${c.resource.emoji}<b>+${fmt(r.resource + r.vipResource)}</b></span><span>⭐<b>+${r.xp} XP</b></span>${r.vipMiles ? `<span>✈️<b>+${r.vipMiles}</b></span>` : ''}</div>`;
-    for (const v of r.vips) html += `<p class="note ${v.satisfied ? 'ok' : 'warn'}">${VIP_BY_ID[v.defId].emoji} ${esc(VIP_BY_ID[v.defId].name)} : ${v.satisfied ? 'ravi !' : esc(v.reason ?? 'déçu')}</p>`;
+    for (const v of r.vips) html += `<p class="note ${v.satisfied ? 'ok' : 'warn'}">${vipPic(v.defId)} ${esc(VIP_BY_ID[v.defId].name)} : ${v.satisfied ? 'ravi !' : esc(v.reason ?? 'déçu')}</p>`;
     return html + (r.doubled ? '' : button({ act: 'doubleReport', args: [r.id], label: '📺 Doubler la récolte', sub: 'Pub', kind: 'ad', wide: true })) + button({ act: 'close', label: 'Super !', kind: 'main', wide: true });
   }
 
@@ -1548,6 +1572,14 @@ export class App {
     return html;
   }
 }
+
+/** Cube art portrait of a shop, VIP or plane, with the emoji as a fallback. */
+function pic(url: string | undefined, fallback: string, cls: string): string {
+  return url ? `<img class="pic ${cls}" src="${url}" alt="">` : fallback;
+}
+const shopPic = (id: string, size = '') => pic(shopSnapshot(id), SHOP_BY_ID[id]?.emoji ?? '?', `shop ${size}`);
+const vipPic = (id: string, size = '') => pic(vipSnapshot(id), VIP_BY_ID[id]?.emoji ?? '?', `vip ${size}`);
+const planePic = (id: string) => pic(planeSnapshot(id), '✈️', 'plane lg');
 
 function fmtPct(p: number): string {
   const v = p * 100;

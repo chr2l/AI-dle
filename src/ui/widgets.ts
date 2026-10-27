@@ -1,6 +1,7 @@
 // HTML building blocks of the interface. Every action button says what it
 // does and what it costs; a button that cannot be used stays tappable and
 // explains why (data-why) instead of silently doing nothing.
+import { iconize } from './icons';
 
 export const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
 
@@ -85,7 +86,7 @@ export const sheetHead = (title: string, sub = '') =>
  */
 export function morph(target: Element, html: string) {
   const tpl = document.createElement('template');
-  tpl.innerHTML = html;
+  tpl.innerHTML = iconize(html);
   morphChildren(target, tpl.content);
 }
 
