@@ -19,7 +19,7 @@ export function canFranchise(state: GameState): Result<number> {
 /**
  * Starts over in a new city. Kept: Alliance stars, Miles, legendary crew,
  * Carnet VIP, album, achievements, lifetime stats, daily streak and quests,
- * seasonal progress, friends and friend code,
+ * seasonal progress, friends and friend code, Dex and box pity,
  * colors, onboarding progress. Everything else restarts.
  */
 export function franchise(state: GameState, now: number): Result<GameState> {
@@ -42,6 +42,8 @@ export function franchise(state: GameState, now: number): Result<GameState> {
     lobbyColor: state.lobbyColor,
     season: state.season,
     social: state.social,
+    gamble: state.gamble,
+    dex: state.dex,
     prestige: { stars: state.prestige.stars + check.value, count: state.prestige.count + 1, runStartedAt: now },
   } satisfies Partial<GameState>);
   return { ok: true, value: next };

@@ -722,6 +722,7 @@ export function collectFlight(state: GameState, planeUid: string, now: number, r
   const event = rollEvent(dest, flightDuration(dest.distance, stats.speed), mystery, now, rng);
   if (event) {
     report.event = { defId: event.id };
+    if (!state.dex.events.includes(event.id)) state.dex.events.push(event.id);
     if (event.kind === 'choice') report.pending = true;
     else if (event.kind === 'malus' && rng() < stats.reliability * AVOID_PER_RELIABILITY) report.event.avoided = true;
     else report.event.outcome = event.outcome;

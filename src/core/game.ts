@@ -1,5 +1,6 @@
 // Top-level loop and onboarding missions.
 import { MISSIONS, type MissionDef } from './data/missions';
+import { recordSeen } from './dex';
 import { type Result, type TickResult, finishBuild, restockExpress, tick } from './engine';
 import { rushCost } from './formulas';
 import type { Rng } from './rng';
@@ -10,6 +11,7 @@ import { spawnVisitors } from './visitors';
 export function update(state: GameState, now: number, rng: Rng = Math.random): TickResult {
   const result = tick(state, now);
   spawnVisitors(state, now, rng);
+  recordSeen(state);
   return result;
 }
 

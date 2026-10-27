@@ -15,3 +15,5 @@ export * from './prestige';
 export * from './calendar';
 export * from './seasons';
 export * from './social';
+export * from './gamble';
+export * from './dex';

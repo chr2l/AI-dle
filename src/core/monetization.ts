@@ -10,7 +10,8 @@ export type AdSlot =
   | 'free_recruit'
   | 'reroll_shop'
   | 'offline_x2'
-  | 'repair';
+  | 'repair'
+  | 'free_box';
 
 /** Minimum delay between two ads on the same slot (the other limits live in the engine: once per flight, per floor…). */
 export const AD_COOLDOWN_MS: Partial<Record<AdSlot, number>> = {
