@@ -9,7 +9,7 @@ name: Release Play Store
 #   ANDROID_KEYSTORE_PASSWORD mot de passe du keystore
 #   ANDROID_KEY_ALIAS         alias de la clé
 #   ANDROID_KEY_PASSWORD      mot de passe de la clé
-# Variable optionnelle : VITE_TELEMETRY_URL (adresse de collecte des statistiques).
+# Variables optionnelles : VITE_TELEMETRY_URL (adresse de collecte des statistiques), VITE_SOCIAL_URL (serveur social, server/social).
 on:
   workflow_dispatch:
 
@@ -34,6 +34,7 @@ jobs:
       - run: npm run build
         env:
           VITE_TELEMETRY_URL: ${{ vars.VITE_TELEMETRY_URL }}
+          VITE_SOCIAL_URL: ${{ vars.VITE_SOCIAL_URL }}
       - name: Projet Android (Capacitor)
         run: |
           [ -d android ] || npx cap add android

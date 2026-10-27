@@ -270,4 +270,6 @@ export interface SocialState {
   visits: { day: number; codes: string[] };
   week: { index: number; startCoins: number };
   lastWeek?: { index: number; score: number; rank: number; players: number; claimed: boolean };
+  /** Secret key proving who we are to the social server (src/ui/socialServer.ts). */
+  key?: string;
 }

@@ -1,0 +1,8 @@
+name = "idleport-social"
+main = "worker.js"
+compatibility_date = "2026-10-01"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "idleport-social"
+database_id = "À REMPLACER après `wrangler d1 create idleport-social`"
