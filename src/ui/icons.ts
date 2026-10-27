@@ -1,6 +1,7 @@
 // Game icons (Phosphor, fill weight), bundled in the APK. iconize() swaps the
 // interface emojis of an HTML string for these SVGs, in text only (never inside tags),
 // so every screen keeps writing plain emojis and gets one consistent icon set.
+import { translateHtmlText, translateTag } from '../i18n';
 import i_airplane from '@phosphor-icons/core/assets/fill/airplane-fill.svg?raw';
 import i_airplane_landing from '@phosphor-icons/core/assets/fill/airplane-landing-fill.svg?raw';
 import i_airplane_takeoff from '@phosphor-icons/core/assets/fill/airplane-takeoff-fill.svg?raw';
@@ -173,8 +174,9 @@ const BY_EMOJI = new Map(ICONS);
 
 /** Replaces the interface emojis in the text parts of an HTML string. */
 export function iconize(html: string): string {
+  // Also where the English version is applied (src/i18n), before emojis become icons.
   return html.replace(/(<[^>]*>)|([^<]+)/g, (_, tag: string | undefined, text: string | undefined) =>
-    tag ?? text!.replace(PATTERN, (e) => BY_EMOJI.get(e) ?? e),
+    tag ? translateTag(tag) : translateHtmlText(text!).replace(PATTERN, (e) => BY_EMOJI.get(e) ?? e),
   );
 }
 

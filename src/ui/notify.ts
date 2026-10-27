@@ -7,6 +7,7 @@ import { LocalNotifications } from '@capacitor/local-notifications';
 import * as G from '../core';
 import type { GameState } from '../core';
 import { settings } from './settings';
+import { t } from '../i18n';
 
 export const NOTIF_KINDS: { id: string; label: string }[] = [
   { id: 'flight', label: 'Avion rentré' },
@@ -59,7 +60,7 @@ export async function scheduleReminders(state: GameState) {
     const list = reminders(state, Date.now());
     if (!list.length) return;
     await LocalNotifications.schedule({
-      notifications: list.map((n) => ({ id: numId(n.id), title: 'IdlePort', body: n.text, schedule: { at: new Date(n.at), allowWhileIdle: true } })),
+      notifications: list.map((n) => ({ id: numId(n.id), title: 'IdlePort', body: t(n.text), schedule: { at: new Date(n.at), allowWhileIdle: true } })),
     });
   } catch {
     /* reminders are a bonus */

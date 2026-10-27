@@ -2,12 +2,15 @@
 // does and what it costs; a button that cannot be used stays tappable and
 // explains why (data-why) instead of silently doing nothing.
 import { iconize } from './icons';
+import { currentLang } from '../i18n';
 
 export const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
 
 /** French short scale names: k, M (million), Md (milliard), Bn (billion)… then aa, ab… */
 const UNITS = ['k', 'M', 'Md', 'Bn', 'Bd', 'Tn', 'Td'];
-const unit = (i: number) => (i < UNITS.length ? UNITS[i] : String.fromCharCode(97 + Math.floor((i - UNITS.length) / 26) % 26, 97 + ((i - UNITS.length) % 26)));
+/** English short scale: k, M, B, T, Qa, Qi, Sx… then aa, ab… */
+const UNITS_EN = ['k', 'M', 'B', 'T', 'Qa', 'Qi', 'Sx'];
+const unit = (i: number) => (i < UNITS.length ? (currentLang() === 'en' ? UNITS_EN : UNITS)[i] : String.fromCharCode(97 + Math.floor((i - UNITS.length) / 26) % 26, 97 + ((i - UNITS.length) % 26)));
 /** Narrow no-break space: French thousands separator and number/unit gap. */
 const NNBSP = '\u202f';
 
@@ -17,7 +20,8 @@ const NNBSP = '\u202f';
  */
 export function fmt(n: number, precise = false): string {
   const v = Math.floor(n);
-  if (Math.abs(v) < 10_000) return String(v).replace(/\B(?=(\d{3})+(?!\d))/g, NNBSP);
+  const en = currentLang() === 'en';
+  if (Math.abs(v) < 10_000) return String(v).replace(/\B(?=(\d{3})+(?!\d))/g, en ? ',' : NNBSP);
   let x = v;
   let i = -1;
   while (Math.abs(x) >= 1000) {
@@ -28,12 +32,12 @@ export function fmt(n: number, precise = false): string {
   const digits = precise ? (abs < 10 ? 2 : abs < 100 ? 1 : 0) : abs < 100 ? 1 : 0;
   // Truncate rather than round, so 999,96 k never shows as « 1000,0 k ».
   const f = 10 ** digits;
-  const shown = (Math.floor(x * f) / f).toFixed(digits).replace('.', ',').replace(/,0+$/, '');
-  return `${shown}${NNBSP}${unit(i)}`;
+  const shown = (Math.floor(x * f) / f).toFixed(digits).replace(/\.0+$/, '').replace('.', en ? '.' : ',');
+  return en ? `${shown}${unit(i)}` : `${shown}${NNBSP}${unit(i)}`;
 }
 
 /** Decimal number in French (« 1,5 »). */
-export const dec = (n: number, digits = 1) => n.toFixed(digits).replace('.', ',');
+export const dec = (n: number, digits = 1) => (currentLang() === 'en' ? n.toFixed(digits) : n.toFixed(digits).replace('.', ','));
 
 /** Per-second rate: one decimal while small, then like fmt(). */
 export const perSec = (n: number) => (n < 1000 ? dec(n) : fmt(n));

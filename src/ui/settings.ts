@@ -3,6 +3,7 @@
 // imported game keeps them.
 import { RARITY_INFO } from '../core/data/shops';
 import type { Rarity } from '../core/types';
+import { setLang } from '../i18n';
 const KEY = 'idleport.settings';
 /** Mute flag from before the settings screen existed. */
 const OLD_MUTE_KEY = 'idleport.mute';
@@ -18,6 +19,8 @@ export interface Settings {
   fps: 30 | 60;
   /** Colors told apart with any color vision (plan de polish IP-29). */
   palette: 'normal' | 'cvd';
+  /** Interface language (plan de polish IP-18); auto follows the phone. */
+  lang: 'auto' | 'fr' | 'en';
   /** Reminders (local notifications) on, and the kinds the player turned off. */
   notif: boolean;
   notifOff: string[];
@@ -28,7 +31,7 @@ export interface Settings {
   installId?: string;
 }
 
-const DEFAULTS: Settings = { sound: true, music: true, haptics: true, motion: 'auto', text: 'normal', fps: 30, palette: 'normal', notif: true, notifOff: [], notifAsked: false, analytics: 'unknown' };
+const DEFAULTS: Settings = { sound: true, music: true, haptics: true, motion: 'auto', text: 'normal', fps: 30, palette: 'normal', lang: 'auto', notif: true, notifOff: [], notifAsked: false, analytics: 'unknown' };
 
 function read(): Settings {
   try {
@@ -78,6 +81,7 @@ export function applySettings(root = document.documentElement) {
   root.classList.toggle('calm', reducedMotion());
   root.dataset.text = settings.text;
   root.dataset.palette = settings.palette;
+  setLang(settings.lang);
   // Rarity colors are display only: the whole interface reads them from RARITY_INFO.
   for (const r of Object.keys(RARITY_INFO) as Rarity[]) RARITY_INFO[r].color = settings.palette === 'cvd' ? CVD_RARITY[r] : BASE_RARITY[r];
 }
