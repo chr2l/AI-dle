@@ -19,3 +19,4 @@ export * from './gamble';
 export * from './dex';
 export * from './convenience';
 export * from './demo';
+export * from './profile';

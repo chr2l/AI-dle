@@ -60,3 +60,30 @@ button .c, .jhint, #tabs button { font-size: 13px; }
   .res .ri { font-size: 18px; }
   .res .rv { font-size: 16px; }
 }
+
+/* --- Tower view reacts (plan de polish IP-11) ------------------------------ */
+.tfloat { position: absolute; pointer-events: none; transform: translateX(-50%); font: 400 17px var(--title); color: var(--accent); text-shadow: 0 2px 0 #000, 0 0 6px #000a; white-space: nowrap; animation: float 1.3s ease-out forwards; }
+.puff { position: absolute; pointer-events: none; width: 120px; height: 34px; margin: 0 0 0 -60px; border-radius: 50%; background: radial-gradient(closest-side, #f3eee0d0, #f3eee000); animation: puff .9s ease-out forwards; }
+@keyframes puff { from { transform: scale(.3, .5); opacity: 1; } to { transform: scale(1.4, 1); opacity: 0; } }
+
+/* --- Colorblind palette (plan de polish IP-29) ----------------------------- */
+:root[data-palette="cvd"] { --ok: #009e73; --warn: #e69f00; --blue: #56b4e9; --ad: #cc79a7; }
+
+/* --- Profile ---------------------------------------------------------------- */
+.career { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; margin-bottom: 12px; }
+.career div { display: grid; grid-template-columns: auto 1fr; column-gap: 8px; align-items: center; padding: 8px 10px; background: #ffffff0d; border-radius: 12px; }
+.career span { grid-row: span 2; font-size: 20px; }
+.career b { font: 400 18px/1.1 var(--title); }
+.career small { margin: 0; font-size: 12px; }
+
+/* --- Tablet and landscape: scene left, panel right (plan de polish IP-30) --- */
+@media (min-width: 700px) and (orientation: landscape) {
+  #ui { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(340px, 1fr); grid-template-rows: auto auto minmax(0, 1fr) auto; grid-template-areas: 'hud hud' 'guide guide' 'tower panel' 'tabs tabs'; }
+  #hud { grid-area: hud; }
+  #guide { grid-area: guide; }
+  #tower { grid-area: tower; border-bottom: 0; border-right: 2px solid var(--line); }
+  #panel { grid-area: panel; }
+  #tabs { grid-area: tabs; }
+  #modal { justify-content: center; }
+  #modal .card { max-width: 560px; border-radius: 20px 20px 0 0; }
+}

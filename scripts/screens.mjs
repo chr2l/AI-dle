@@ -32,6 +32,30 @@ for (const size of SIZES) {
   await page.click('.gear');
   await page.waitForTimeout(500);
   await page.screenshot({ path: `${out}/${size.name}-reglages.png` });
+  await page.click('#modal', { position: { x: 5, y: 5 } });
+  await page.click('#hud .lvl');
+  await page.waitForTimeout(500);
+  await page.screenshot({ path: `${out}/${size.name}-profil.png` });
+  await page.close();
+}
+
+// Night on the local clock, and the tablet / landscape layout.
+const extra = [
+  { name: 'nuit-412x915', viewport: { width: 412, height: 915 }, time: '2026-10-27T23:00:00' },
+  { name: 'tablette-1280x800', viewport: { width: 1280, height: 800 }, tab: 'vols' },
+];
+for (const shot of extra) {
+  const page = await browser.newPage({ viewport: shot.viewport, deviceScaleFactor: 1.5 });
+  page.on('pageerror', (e) => errors.push(`${shot.name}: ${e.message}`));
+  if (shot.time) await page.clock.setFixedTime(new Date(shot.time));
+  await page.addInitScript(() => localStorage.setItem('idleport.welcome', '1'));
+  await page.goto(`${url}?demo=1`);
+  await page.waitForTimeout(1500);
+  if (shot.tab) {
+    await page.click(`#tabs [data-tab="${shot.tab}"]`);
+    await page.waitForTimeout(700);
+  }
+  await page.screenshot({ path: `${out}/${shot.name}.png` });
   await page.close();
 }
 await browser.close();

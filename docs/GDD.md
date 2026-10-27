@@ -446,7 +446,7 @@ Revendre l'aéroport pour en ouvrir un dans une nouvelle ville.
 - ✅ Franchise (prestige)
 - ✅ Rétention : cadeau quotidien, quêtes du jour, succès, album, pays de la semaine, notifications planifiées (§18)
 - ✅ Événements saisonniers à thème (§19) et social : amis, cadeaux, visites, classements (§20), côté moteur
-- ✅ Polish (plan IP-01 à IP-20) : sauvegarde blindée, Réglages, retour Android, rappels locaux, musique, boutique (boost, Pass), captures automatiques, workflow de release (docs/PLAY-STORE.md)
+- ✅ Polish (plan IP-01 à IP-31) : sauvegarde blindée, Réglages, retour Android, rappels locaux, musique, boutique (boost, Pass), captures automatiques, workflow de release (docs/PLAY-STORE.md), scène qui réagit, jour et nuit, profil et photo, mode paysage
 - ⏳ Post-MVP : vrai serveur social, vrais SDK pubs/IAP (docs/MONETISATION.md), version anglaise
 
 ## 18. Durée de vie et rétention
@@ -593,6 +593,12 @@ Interface DOM (`src/ui`) au-dessus de la vue cube art, pensée pour le portrait 
 - **Musique** : synthétisée, une ambiance par pays de la semaine (tonalité, tempo, timbre), très discrète, coupée en arrière-plan ; interrupteur dans les Réglages.
 - **Premiers pas** : au premier lancement, une phrase de bienvenue (les règles complètes restent dans Réglages > Comment jouer). Pendant les 6 premières missions, une main animée pointe le bouton à toucher. Le compteur de Miles apparaît après la première mission, celui des passagers à la mission « Envoyer un vol ».
 - **Statistiques et erreurs** (`telemetry.ts`) : événements anonymes (sessions, missions, niveaux, déblocages, erreurs) gardés sur le téléphone ; envoyés seulement si une adresse de collecte est configurée au build (`VITE_TELEMETRY_URL`) et que le joueur accepte. Réglages > Signaler un problème donne un rapport à copier avec les dernières erreurs.
+- **Scène qui réagit** : sur la vue de toute la tour, toucher un étage y emmène l'ascenseur. Toutes les 3 secondes, les étages qui vendent affichent leur gain (« +12 🪙 »). Un étage terminé tombe à sa place avec un nuage de poussière ; un décollage secoue légèrement la caméra.
+- **Jour, nuit et météo** : la lumière suit l'heure du téléphone (aube de 6 h à 8 h, crépuscule de 19 h à 21 h, nuit teintée de bleu) ; neige à Givrebourg, pluie à Tropicalia et Nuagelande, braises à Infernia.
+- **Vibrations graduées** : légère au toucher, moyenne pour un achat, un décollage ou un étage posé, forte pour un niveau ou un Légendaire.
+- **Profil** (toucher la barre de niveau) : niveau, statistiques de carrière, et « Photo de mon aéroport » (vue cadrée 1080×1350 avec le nom et le niveau, partagée par la feuille de partage du téléphone).
+- **Couleurs** : palette « Daltonien » dans les Réglages (raretés et états en couleurs Okabe-Ito).
+- **Tablette et paysage** (plus de 700 px de large en paysage) : la scène reste à gauche sur tous les onglets, le panneau à droite.
 - **Accessibilité** : zones tactiles de 44 px, texte de 12 px minimum, contour de focus visible.
 
 ## 22. Gamble : boîtes de plans et pari de rareté
