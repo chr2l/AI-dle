@@ -13,8 +13,9 @@ import { RUNWAY_CENTER_Z, SCENERY } from '../render/models/scenery';
 import { PixelRenderer } from '../render/pixelRenderer';
 import { buildTower, floorY } from '../render/tower';
 
-/** Animation frame rate cap, to spare mobile batteries. */
-const FPS = 30;
+/** Animation frame rate cap, to spare mobile batteries (Réglages: 30 or 60). */
+let FPS = 30;
+export const setTowerFps = (fps: number) => (FPS = fps);
 /** Zoom (CSS pixels per voxel) on a single floor, and on the whole tower. */
 const ZOOM_FLOOR = 14;
 const ZOOM_OVERVIEW = 6;

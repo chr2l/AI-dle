@@ -2,27 +2,15 @@
 // to the counter, confetti bursts. Everything degrades silently when the
 // platform lacks the feature.
 import { Haptics, ImpactStyle, NotificationType } from '@capacitor/haptics';
+import { reducedMotion, setSetting, settings } from './settings';
 
-const MUTE_KEY = 'idleport.mute';
 let ctx: AudioContext | null = null;
-let muted = (() => {
-  try {
-    return localStorage.getItem(MUTE_KEY) === '1';
-  } catch {
-    return false;
-  }
-})();
 
-export const isMuted = () => muted;
+export const isMuted = () => !settings.sound;
 
 export function toggleMute(): boolean {
-  muted = !muted;
-  try {
-    localStorage.setItem(MUTE_KEY, muted ? '1' : '0');
-  } catch {
-    /* not persisted */
-  }
-  return muted;
+  setSetting('sound', !settings.sound);
+  return !settings.sound;
 }
 
 type Note = [freq: number, at: number, len: number, type?: OscillatorType, gain?: number];
@@ -37,7 +25,7 @@ const SOUNDS: Record<'tap' | 'coin' | 'success' | 'error' | 'levelup' | 'whoosh'
 };
 
 export function sound(name: keyof typeof SOUNDS) {
-  if (muted) return;
+  if (!settings.sound) return;
   try {
     ctx ??= new AudioContext();
     if (ctx.state === 'suspended') void ctx.resume();
@@ -60,6 +48,7 @@ export function sound(name: keyof typeof SOUNDS) {
 }
 
 export function haptic(kind: 'light' | 'success' | 'error' = 'light') {
+  if (!settings.haptics) return;
   try {
     if (kind === 'light') void Haptics.impact({ style: ImpactStyle.Light }).catch(() => {});
     else void Haptics.notification({ type: kind === 'success' ? NotificationType.Success : NotificationType.Error }).catch(() => {});
@@ -71,6 +60,12 @@ export function haptic(kind: 'light' | 'success' | 'error' = 'light') {
 /** Coins (or another icon) flying from a point to an element, which then bounces. */
 export function flyTo(layer: HTMLElement, from: { x: number; y: number }, to: HTMLElement | null, icon = '🪙', count = 6) {
   if (!to) return;
+  if (reducedMotion()) {
+    to.classList.remove('bump');
+    void to.offsetWidth;
+    to.classList.add('bump');
+    return;
+  }
   const r = to.getBoundingClientRect();
   const tx = r.left + r.width / 2;
   const ty = r.top + r.height / 2;
@@ -103,6 +98,7 @@ export function flyTo(layer: HTMLElement, from: { x: number; y: number }, to: HT
 const CONFETTI = ['#ffd23f', '#ff6fb5', '#3fa7ff', '#2ec4a6', '#ff7a59', '#c86bfa'];
 
 export function confetti(layer: HTMLElement, from: { x: number; y: number }, count = 26) {
+  if (reducedMotion()) return;
   for (let i = 0; i < count; i++) {
     const el = document.createElement('i');
     el.className = 'confetti';

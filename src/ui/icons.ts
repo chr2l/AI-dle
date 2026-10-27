@@ -24,6 +24,7 @@ import i_dice_five from '@phosphor-icons/core/assets/fill/dice-five-fill.svg?raw
 import i_door_open from '@phosphor-icons/core/assets/fill/door-open-fill.svg?raw';
 import i_eye from '@phosphor-icons/core/assets/fill/eye-fill.svg?raw';
 import i_flask from '@phosphor-icons/core/assets/fill/flask-fill.svg?raw';
+import i_gear_six from '@phosphor-icons/core/assets/fill/gear-six-fill.svg?raw';
 import i_gift from '@phosphor-icons/core/assets/fill/gift-fill.svg?raw';
 import i_globe from '@phosphor-icons/core/assets/fill/globe-fill.svg?raw';
 import i_globe_hemisphere_west from '@phosphor-icons/core/assets/fill/globe-hemisphere-west-fill.svg?raw';
@@ -34,6 +35,7 @@ import i_headphones from '@phosphor-icons/core/assets/fill/headphones-fill.svg?r
 import i_hourglass from '@phosphor-icons/core/assets/fill/hourglass-fill.svg?raw';
 import i_identification_badge from '@phosphor-icons/core/assets/fill/identification-badge-fill.svg?raw';
 import i_identification_card from '@phosphor-icons/core/assets/fill/identification-card-fill.svg?raw';
+import i_question from '@phosphor-icons/core/assets/fill/question-fill.svg?raw';
 import i_info from '@phosphor-icons/core/assets/fill/info-fill.svg?raw';
 import i_letter_circle_p from '@phosphor-icons/core/assets/fill/letter-circle-p-fill.svg?raw';
 import i_lightbulb from '@phosphor-icons/core/assets/fill/lightbulb-fill.svg?raw';
@@ -64,6 +66,7 @@ import i_toolbox from '@phosphor-icons/core/assets/fill/toolbox-fill.svg?raw';
 import i_tray_arrow_down from '@phosphor-icons/core/assets/fill/tray-arrow-down-fill.svg?raw';
 import i_trend_up from '@phosphor-icons/core/assets/fill/trend-up-fill.svg?raw';
 import i_trophy from '@phosphor-icons/core/assets/fill/trophy-fill.svg?raw';
+import i_tray_arrow_up from '@phosphor-icons/core/assets/fill/tray-arrow-up-fill.svg?raw';
 import i_truck from '@phosphor-icons/core/assets/fill/truck-fill.svg?raw';
 import i_users_three from '@phosphor-icons/core/assets/fill/users-three-fill.svg?raw';
 import i_warning from '@phosphor-icons/core/assets/fill/warning-fill.svg?raw';
@@ -143,6 +146,9 @@ const ICONS: [string, string][] = [
   ['🚚', svg(i_truck, '')],
   ['⏳', svg(i_hourglass, '')],
   ['📥', svg(i_tray_arrow_down, '')],
+  ['📤', svg(i_tray_arrow_up, '')],
+  ['⚙', svg(i_gear_six, '')],
+  ['❓', svg(i_question, '')],
   ['⏱', svg(i_timer, '')],
   ['🪪', svg(i_identification_card, '')],
   ['🥇', svg(i_medal, 'gold')],
