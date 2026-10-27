@@ -599,6 +599,8 @@ Interface DOM (`src/ui`) au-dessus de la vue cube art, pensée pour le portrait 
 - **Profil** (toucher la barre de niveau) : niveau, statistiques de carrière, et « Photo de mon aéroport » (vue cadrée 1080×1350 avec le nom et le niveau, partagée par la feuille de partage du téléphone).
 - **Couleurs** : palette « Daltonien » dans les Réglages (raretés et états en couleurs Okabe-Ito).
 - **Tablette et paysage** (plus de 700 px de large en paysage) : la scène reste à gauche sur tous les onglets, le panneau à droite.
+- **Capucine, cheffe d'escale** : mascotte en cube art (uniforme bleu marine, casquette, bloc-notes) qui accueille le joueur, signe le journal et les bandeaux de conseil.
+- **Performance** : simulation 4 fois par seconde (le compteur de pièces défile toujours à chaque image) ; la scène passe à 4 images par seconde quand une fenêtre la couvre ; résolution adaptative (si dessiner une image prend plus de la moitié du budget, la densité de pixels baisse par paliers jusqu'à 1). Les statistiques notent le temps de démarrage et les images par seconde de chaque session.
 - **Accessibilité** : zones tactiles de 44 px, texte de 12 px minimum, contour de focus visible.
 
 ## 22. Gamble : boîtes de plans et pari de rareté

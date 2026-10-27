@@ -14,7 +14,7 @@ import { VIP_BY_ID } from '../core/data/vips';
 import type { SeasonReward } from '../core/data/seasons';
 import type { CrewMember, CrewRole, Destination, GameState, PlaneState, StatKey } from '../core';
 import { HELP } from './help';
-import { planeSnapshot, shopSnapshot, vipSnapshot } from './snapshot';
+import { guideSnapshot, planeSnapshot, shopSnapshot, vipSnapshot } from './snapshot';
 import '@fontsource/nunito/latin-600.css';
 import '@fontsource/nunito/latin-700.css';
 import '@fontsource/nunito/latin-800.css';
@@ -247,12 +247,18 @@ export class App {
       this.root.querySelector<HTMLElement>('#tower canvas')!.remove();
     }
     void this.social.publish(G.publicProfile(this.state, Date.now()));
+    // Simulation 4 times a second (plan de polish IP-20); the coin counter still rolls every frame.
+    let simAt = 0;
     const frame = () => {
-      const tick = G.update(this.state, Date.now());
-      // Back from the background (frames stop while hidden): show what happened.
-      if (tick.seconds >= 60 && !this.sheetLocked) {
-        saveGame(this.state);
-        this.showOffline(tick);
+      const now = Date.now();
+      if (now - simAt >= 250) {
+        simAt = now;
+        const tick = G.update(this.state, now);
+        // Back from the background (frames stop while hidden): show what happened.
+        if (tick.seconds >= 60 && !this.sheetLocked) {
+          saveGame(this.state);
+          this.showOffline(tick);
+        }
       }
       this.rollCoins();
       requestAnimationFrame(frame);
@@ -270,7 +276,7 @@ export class App {
         music.stop();
         saveGame(this.state);
         void scheduleReminders(this.state);
-        track('session_end', { sec: Math.round((Date.now() - this.sessionStart) / 1000), lvl: this.state.level });
+        track('session_end', { sec: Math.round((Date.now() - this.sessionStart) / 1000), lvl: this.state.level, fps: this.tower?.fps() ?? 0 });
         void flush();
       } else {
         this.sessionStart = Date.now();
@@ -282,7 +288,7 @@ export class App {
     });
     watchErrors(__APP_VERSION__);
     void cancelReminders();
-    track('session_start', this.summary());
+    track('session_start', { ...this.summary(), boot: Math.round(performance.now()) });
     void flush();
     void NativeApp.addListener('backButton', () => this.back()).catch(() => {});
     if (!storage.get(WELCOME_KEY) && !this.sheet) this.openIntro();
@@ -298,8 +304,8 @@ export class App {
   private openIntro() {
     track('first_launch');
     this.sheet = () =>
-      `<div class="unlock"><div class="uicon">✈️</div><small>Bienvenue à</small><h2>IdlePort</h2>` +
-      `<p>Construisez votre aéroport étage par étage, ouvrez des magasins et envoyez vos avions aux quatre coins de la carte. Le journal vous guide pas à pas.</p></div>` +
+      `<div class="unlock"><div class="uicon">${pic(guideSnapshot(), '✈️', 'guide xl')}</div><small>Bienvenue à</small><h2>IdlePort</h2>` +
+      `<p>Je suis Capucine, votre cheffe d’escale. Construisez votre aéroport étage par étage, ouvrez des magasins et envoyez vos avions aux quatre coins de la carte : je vous guide pas à pas dans le journal.</p></div>` +
       button({ act: 'welcomeDone', label: 'C’est parti !', kind: 'main', wide: true });
   }
 
@@ -1070,7 +1076,7 @@ export class App {
     if (showGuide) {
       const there = TABS.find((t) => t.id === step.tab)!;
       morph(guide,
-        `<span class="bulb">💡</span><p>${esc(step.text)}</p>` +
+        `<span class="bulb">${guidePic()}</span><p>${esc(step.text)}</p>` +
         (G.currentMission(s)?.done
           ? button({ act: 'mission', label: 'Récupérer', kind: 'main', small: true })
           : step.tab !== this.tab || (step.view && step.view !== this.volsView) ? button({ act: 'tab', args: [step.tab, step.view], label: `Aller ${there.icon}`, kind: 'main', small: true }) : ''));
@@ -1084,6 +1090,7 @@ export class App {
     ).join(''));
 
     const towerBox = this.root.querySelector<HTMLElement>('#tower')!;
+    if (this.tower) this.tower.paused = !!this.sheet;
     // Tablet or landscape: the tower stays on the left of every tab (plan de polish IP-30).
     const tour = this.tab === 'tour';
     towerBox.hidden = !tour && !WIDE.matches;
@@ -1209,7 +1216,7 @@ export class App {
       return `<button class="jpill${mission?.done ? ' done' : ''}" data-act="journal">📋 ${mission ? (mission.done ? 'Mission accomplie !' : `${mission.progress}/${mission.def.goal}`) : 'Journal'} ▸</button>` +
         (mission?.done ? button({ act: 'mission', label: 'Récupérer', kind: 'main', small: true, tuto: 'mission' }) : '');
     }
-    let html = `<div class="jhead"><b>📋 Journal</b><span><button class="info" data-act="help" data-args='["mission"]'>ⓘ</button><button class="info" data-act="journal" aria-label="Replier">▾</button></span></div>`;
+    let html = `<div class="jhead"><b>${guidePic()} Journal</b><span><button class="info" data-act="help" data-args='["mission"]'>ⓘ</button><button class="info" data-act="journal" aria-label="Replier">▾</button></span></div>`;
     if (mission) {
       html +=
         `<div class="jmission"><b>${esc(mission.def.text)}</b>${bar(mission.progress / mission.def.goal)}` +
@@ -2163,6 +2170,8 @@ function pic(url: string | undefined, fallback: string, cls: string): string {
 const shopPic = (id: string, size = '') => pic(shopSnapshot(id), SHOP_BY_ID[id]?.emoji ?? '?', `shop ${size}`);
 const vipPic = (id: string, size = '') => pic(vipSnapshot(id), VIP_BY_ID[id]?.emoji ?? '?', `vp ${size}`);
 const planePic = (id: string) => pic(planeSnapshot(id), '✈️', 'plane lg');
+/** Capucine, the guide (plan de polish IP-24). */
+const guidePic = () => pic(guideSnapshot(), '💡', 'guide');
 
 /** One condition line: ✔ met, ✖ missing, ⚠ risky, ⓘ information. */
 function cond(state: boolean | 'warn' | 'info', html: string): string {

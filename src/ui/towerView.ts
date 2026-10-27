@@ -51,6 +51,12 @@ export class TowerView {
   private sky = new Color();
   private tint = new Color(1, 1, 1);
   private lightAt = 0;
+  /** A sheet covers the scene: 4 frames per second are enough behind it (plan de polish IP-20). */
+  paused = false;
+  /** Average time to draw a frame (ms) and frames drawn, for the adaptive resolution and statistics. */
+  private drawMs = 0;
+  frames = 0;
+  private framesSince = performance.now();
   private country = '';
 
   constructor(readonly canvas: HTMLCanvasElement) {
@@ -79,12 +85,14 @@ export class TowerView {
     const loop = (now: number) => {
       requestAnimationFrame(loop);
       // Skip frames while the view is hidden (other tabs) or over the FPS cap.
-      if (!this.canvas.clientWidth || now - this.lastFrame < 1000 / FPS) return;
+      if (!this.canvas.clientWidth || now - this.lastFrame < 1000 / (this.paused ? 4 : FPS)) return;
       this.lastFrame = now;
       this.airport.tick(Date.now());
       this.weather.tick(now / 1000, this.view.target);
       this.animateDrops(now);
+      const t0 = performance.now();
       this.draw();
+      this.adapt(performance.now() - t0);
     };
     requestAnimationFrame(loop);
   }
@@ -147,6 +155,30 @@ export class TowerView {
     voxelMaterial.color.copy(this.tint);
     this.view.render();
     voxelMaterial.color.setRGB(1, 1, 1);
+  }
+
+  /**
+   * Adaptive resolution: on a phone that struggles (frames slower than half
+   * the frame budget on average), render with fewer pixels per CSS pixel.
+   */
+  private adapt(ms: number) {
+    this.frames++;
+    this.drawMs = this.drawMs ? this.drawMs * 0.95 + ms * 0.05 : ms;
+    if (this.frames % 60 !== 0) return;
+    const ratio = this.view.renderer.getPixelRatio();
+    if (this.drawMs > 500 / FPS && ratio > 1) {
+      this.view.renderer.setPixelRatio(Math.max(1, ratio - 0.5));
+      this.resize();
+    }
+  }
+
+  /** Frames per second actually drawn since the last call (statistics). */
+  fps(): number {
+    const now = performance.now();
+    const fps = (this.frames * 1000) / Math.max(1, now - this.framesSince);
+    this.frames = 0;
+    this.framesSince = now;
+    return Math.round(fps);
   }
 
   /** Short camera shake (takeoff, landing of a floor). */
