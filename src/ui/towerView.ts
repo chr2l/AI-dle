@@ -6,7 +6,7 @@
 // reacts (plan de polish IP-11, IP-22): touching a floor of the whole tower
 // flies to it, a finished floor drops into place, takeoffs shake the camera,
 // and the light follows the local hour with the weather of the week.
-import { Color, Group, Raycaster, Vector2, Vector3, type Object3D } from 'three';
+import { Color, Fog, Group, Raycaster, Vector2, Vector3, type Object3D } from 'three';
 import { SHOP_BY_ID } from '../core/data/shops';
 import { featuredCountry } from '../core/destinations';
 import type { GameState } from '../core';
@@ -24,6 +24,9 @@ export const setTowerFps = (fps: number) => (FPS = fps);
 const ZOOM_FLOOR = 14;
 const ZOOM_OVERVIEW = 6;
 const ZOOM_RUNWAY = 7;
+/** Distances behind the tower's foot (along the view) where the far land starts fading into the sky, and is gone. */
+const FOG_NEAR = 150;
+const FOG_FAR = 420;
 /** Stop below the hall: the runway, to watch planes take off and land. */
 export const RUNWAY_STOP = -1;
 
@@ -49,8 +52,11 @@ export class TowerView {
   private shakeUntil = 0;
   private weather = new Weather();
   private sky = new Color();
+  private fog = new Fog(0xffffff, 200, 500);
   private tint = new Color(1, 1, 1);
   private lightAt = 0;
+  /** CSS pixels covered by the HUD at the top and the panel at the bottom: the tower is framed between them. */
+  inset = { top: 0, bottom: 0, right: 0 };
   /** A sheet covers the scene: 4 frames per second are enough behind it (plan de polish IP-20). */
   paused = false;
   /** Average time to draw a frame (ms) and frames drawn, for the adaptive resolution and statistics. */
@@ -64,6 +70,8 @@ export class TowerView {
     this.view.scene.add(this.content);
     this.view.scene.add(this.airport.group);
     this.view.scene.add(this.weather.points);
+    // The far land fades into the sky behind the airport (see horizon.ts).
+    this.view.scene.fog = this.fog;
     let start: { y: number; t: number } | null = null;
     canvas.addEventListener('pointerdown', (e) => (start = { y: e.clientY, t: Date.now() }));
     addEventListener('pointerup', (e) => {
@@ -133,7 +141,8 @@ export class TowerView {
     const overview = stop > this.floorCount;
     const runway = stop === RUNWAY_STOP;
     const targetY = runway ? 0 : overview ? floorY(this.floorCount + 1) * 0.55 : floorY(stop) + FLOOR.height * 0.45;
-    const targetZoom = runway ? ZOOM_RUNWAY : overview ? Math.min(ZOOM_OVERVIEW, (this.canvas.clientHeight * 0.8) / Math.max(30, floorY(this.floorCount + 2) * 1.1)) : ZOOM_FLOOR;
+    const free = Math.max(120, this.canvas.clientHeight - this.inset.top - this.inset.bottom);
+    const targetZoom = runway ? ZOOM_RUNWAY : overview ? Math.min(ZOOM_OVERVIEW, (free * 0.85) / Math.max(30, floorY(this.floorCount + 2) * 1.1)) : ZOOM_FLOOR;
     // The runway lies in front of the tower: the camera slides there along the same axis.
     const targetX = runway ? (SCENERY.runway.x0 + SCENERY.runway.x1) / 4 : FLOOR.width / 2;
     const targetZ = runway ? RUNWAY_CENTER_Z : FLOOR.depth / 2;
@@ -146,9 +155,16 @@ export class TowerView {
     const { width, height } = this.view.artSize;
     const halfW = width / this.zoom / 2;
     const halfH = height / this.zoom / 2;
-    Object.assign(this.view.camera, { left: -halfW, right: halfW, top: halfH, bottom: -halfH });
+    // Shift the frame so the target sits in the middle of the free band, not of the screen.
+    const shift = ((this.inset.bottom - this.inset.top) / 2) * (height / Math.max(1, this.canvas.clientHeight)) / this.zoom;
+    const side = (this.inset.right / 2) * (width / Math.max(1, this.canvas.clientWidth)) / this.zoom;
+    Object.assign(this.view.camera, { left: -halfW + side, right: halfW + side, top: halfH - shift, bottom: -halfH - shift });
     this.view.camera.updateProjectionMatrix();
     this.view.target.set(this.camX, this.camY, this.camZ);
+    // Fog depth is measured from the camera, which rides with the elevator: keep it anchored on the tower's foot.
+    const foot = 100 + (this.camX - FLOOR.width / 2 + this.camY + this.camZ - FLOOR.depth / 2) / Math.sqrt(3);
+    this.fog.near = foot + FOG_NEAR;
+    this.fog.far = foot + FOG_FAR;
     const shake = this.shakeUntil - performance.now();
     if (shake > 0) this.view.target.x += Math.sin(shake / 18) * (shake / 400) * 0.6;
     // The night tint applies to this view only: portraits share the material.
@@ -243,6 +259,7 @@ export class TowerView {
     this.tint.copy(tint);
     this.sky.copy(sky);
     this.view.scene.background = this.sky;
+    this.fog.color.copy(this.sky);
     this.weather.set(WEATHER[featuredCountry(now)] ?? null);
   }
 

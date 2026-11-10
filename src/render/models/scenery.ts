@@ -26,7 +26,7 @@ export const SCENERY = {
 
 export const RUNWAY_CENTER_Z = (SCENERY.runway.z0 + SCENERY.runway.z1) / 2;
 
-interface Theme {
+export interface Theme {
   /** Background color behind the scene. */
   sky: number;
   ground: number;
@@ -209,6 +209,11 @@ export function buildCloudModel(seed: number): VoxelGrid {
     g.box(x, 0, z, x + 3, 1 + Math.floor(rand() * 2), z + 2, 0xffffff);
   }
   return g;
+}
+
+/** Colors and decor of a scenery theme (the land beyond reuses them, see horizon.ts). */
+export function sceneryTheme(element: Element): Theme {
+  return THEMES[element] ?? THEMES.neutre;
 }
 
 /** Sky color matching a scenery theme. */
