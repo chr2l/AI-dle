@@ -35,6 +35,7 @@ import { applySettings, onSettings, reducedMotion, setSetting, settings, type Se
 import { confetti, flyTo, haptic, sound } from './fx';
 import { FEATURES, guideStep, isTabOpen, tabBadges, unlocked, type Feature, type Tab } from './tutorial';
 import { currentLang } from '../i18n';
+import { cityOpen, closeCity, openCityProto } from './cityProto';
 import { HttpSocialBackend, SOCIAL_URL, socialKey } from './socialServer';
 import { bar, button, chip, dec, dur, esc, fmt, lack, morph, perSec, pips, section, sheetHead, timerBar } from './widgets';
 
@@ -340,7 +341,9 @@ export class App {
 
   /** Android back: closes the sheet, else returns to the Tour tab, else offers to quit. */
   private back() {
-    if (this.sheet) {
+    if (cityOpen()) {
+      closeCity();
+    } else if (this.sheet) {
       if (!this.sheetLocked) this.closeSheet();
     } else if (this.tab !== 'tour') {
       this.goTab('tour');
@@ -519,6 +522,10 @@ export class App {
         break;
       case 'photo':
         void this.takePhoto();
+        break;
+      case 'city':
+        this.closeSheet();
+        openCityProto(this.state);
         break;
       case 'set':
         setSetting(a[0] as keyof Settings, a[1] as never);
@@ -1028,6 +1035,7 @@ export class App {
       sheetHead(`👤 ${esc(s.social.name)}`, `Code ami ${esc(s.social.code)}`) +
       `<div class="card"><b>⭐ Niveau ${s.level}</b>${bar(s.xp / xpNeed, 'xp')}<small>${fmt(s.xp)}/${fmt(xpNeed)} XP · <span>chaque dépense et chaque vol en rapporte. Monter ouvre des étages, des avions et des pays.</span></small></div>` +
       `<h3>Carrière</h3><div class="career">${lines.map((l) => `<div><span>${l.icon}</span><b>${l.coins ? fmt(l.value) : l.value.toLocaleString(currentLang() === 'en' ? 'en-US' : 'fr-FR')}</b><small>${l.label}</small></div>`).join('')}</div>` +
+      button({ act: 'city', label: '🏗️ Essayer l’aéroport à plat', sub: 'Prototype : poser et déplacer ses salles', kind: 'main', wide: true }) +
       (this.tower ? button({ act: 'photo', label: '📷 Photo de mon aéroport', sub: 'À partager avec vos amis', kind: 'main', wide: true }) : '') +
       button({ act: 'close', label: 'Fermer', kind: 'ghost', wide: true })
     );
