@@ -655,3 +655,13 @@ Une encyclopédie qui regroupe toutes les collections, avec les entrées trouvé
 
 - **Récompenses de complétion**, par section : 25 % → 5 ✈️, 50 % → 10 ✈️, 75 % → 20 ✈️, 100 % → 50 ✈️ (425 ✈️ au total). Un badge indique les récompenses prêtes.
 - Le Dex survit à la Franchise. Le bonus de revenus des séries complètes reste celui de l'album (§18.5).
+
+## 24. Aéroport à plat (city builder) — prototype
+
+Décision du 10 novembre 2026 : la tour laisse place à un aéroport qu'on étale sur un terrain en grille (proposition complète : terrain, salles, adjacences, décors, collection d'avions, plan en 6 étapes). **Étape 1 en place** : un prototype jouable, séparé de la partie (Profil › « Essayer l'aéroport à plat »), qui garde son propre plan dans `localStorage` (`idleport.city`).
+
+- **Moteur** (`src/core/city.ts`, testé) : grille de 20 × 20 cases, bâtiments à empreinte (terminal 3 × 3 unique, couloir 1 × 1, salle 2 × 2, porte 2 × 1, piste 2 × 10, tour de contrôle 2 × 2 unique, décors), pose, déplacement, rotation d'un quart, retrait (sauf le terminal).
+- **Règles de position** d'une salle : reliée au terminal par des couloirs (sinon ×0), +10 % par salle voisine partageant un élément, zone de salles de même catégorie qui se touchent (+10 % dès 3, +25 % dès 6, +50 % dès 10), beauté des décors à portée (+3 % par point, plafond +30 % ; arbre et banc 1, parterre 2, fontaine 4 à 2 cases), porte à 2 cases ou moins (+15 %).
+- **Départ** : terminal au centre, couloirs autour, les magasins actuels du joueur posés tout autour (c'est ainsi que les sauvegardes seront converties à l'étape 3).
+- **Écran** (`src/ui/cityProto.ts`, modèles `src/render/models/city.ts`) : glisser pour déplacer la vue, pincer ou molette pour zoomer, barre de construction en bas, fantôme vert ou rouge avant de poser, fiche de bonus en touchant une salle, « ! » rouge sur ce qui n'est pas relié.
+- Pas encore : coûts, parcelles, lien avec les revenus réels, avions sur la piste.
