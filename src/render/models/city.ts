@@ -16,7 +16,22 @@ const GLASS = 0x5b8fc9;
 
 const CATEGORY_COLOR: Record<string, number> = { resto: 0xf4a259, boutique: 0xe56b9f, detente: 0x7cc6a4, service: 0x6c8ebf, loisir: 0xa883d8 };
 
-/** Grass plot with faint tile seams. */
+/** Fence along the runway side, with a gap in front of each gate. */
+export function buildFenceModel(layout: CityLayout): VoxelGrid {
+  const D = layout.depth * TILE;
+  const g = new VoxelGrid(1, 4, D);
+  const gates = layout.items.filter((p) => p.kind === 'porte').map(footprint);
+  for (let z = 0; z < D; z++) {
+    const tz = Math.floor(z / TILE);
+    if (gates.some((r) => tz >= r.z && tz < r.z + r.d)) continue;
+    if (z % 3 === 0) g.box(0, 1, z, 0, 3, z, 0x6b6f7a);
+    g.set(0, 3, z, 0xd6d9df);
+    if (z % 2) g.set(0, 2, z, 0xd6d9df);
+  }
+  return g;
+}
+
+/** Grass on the terminal side, concrete on the runway side, faint tile seams. */
 export function buildGroundModel(layout: CityLayout): VoxelGrid {
   const W = layout.width * TILE;
   const D = layout.depth * TILE;
@@ -27,8 +42,9 @@ export function buildGroundModel(layout: CityLayout): VoxelGrid {
       const tx = Math.floor(x / TILE);
       const tz = Math.floor(z / TILE);
       const seam = x % TILE === 0 || z % TILE === 0;
-      const base = GRASS[(tx + tz) % 2];
-      g.set(x, 0, z, grain(rand, seam ? darken(base, 0.06) : base, 0.04));
+      const airside = tx >= layout.airsideX;
+      const base = airside ? (tz % 2 ? 0xb9bcc4 : 0xb3b6be) : GRASS[(tx + tz) % 2];
+      g.set(x, 0, z, grain(rand, seam ? darken(base, airside ? 0.12 : 0.06) : base, 0.03));
     }
   return g;
 }
@@ -45,6 +61,8 @@ export function buildPlacedModel(p: Placed): VoxelGrid {
     case 'salle': return room(p, W, D, rand);
     case 'porte': return gate(W, D);
     case 'piste': return runway(W, D);
+    case 'voie': return taxiway(W, D, rand);
+    case 'stand': return stand(W, D);
     case 'tour': return tower(W, D, rand);
     case 'arbre': return tree(W, D, rand);
     case 'banc': return bench(W, D);
@@ -135,6 +153,26 @@ function runway(W: number, D: number): VoxelGrid {
       const centre = (across === Math.floor(span / 2) || across === Math.floor(span / 2) - 1) && along % 6 < 3;
       g.set(x, 0, z, edge ? (along % 4 === 0 ? 0xffe28a : 0xeeeeee) : centre ? 0xffffff : 0x3a3d48);
     }
+  return g;
+}
+
+function taxiway(W: number, D: number, rand: () => number): VoxelGrid {
+  const g = new VoxelGrid(W, 1, D);
+  for (let z = 0; z < D; z++) for (let x = 0; x < W; x++) g.set(x, 0, z, grain(rand, 0x4a4d58, 0.03));
+  // Yellow centre dot: lines up into a guide line across a row of taxiways.
+  const c = Math.floor(W / 2);
+  g.box(c - 1, 0, c - 1, c, 0, c, 0xffd23f);
+  return g;
+}
+
+function stand(W: number, D: number): VoxelGrid {
+  const g = new VoxelGrid(W, 1, D);
+  for (let z = 0; z < D; z++) for (let x = 0; x < W; x++) g.set(x, 0, z, (x + z) % 2 ? 0xc9ccd3 : 0xc3c6cd);
+  // Yellow lead-in line and stop bar, red safety box at the gate end.
+  const c = Math.floor(D / 2);
+  for (let x = 1; x < W - 1; x++) g.set(x, 0, c, 0xffd23f);
+  g.box(2, 0, c - 3, 2, 0, c + 3, 0xffd23f);
+  g.box(0, 0, 0, 0, 0, D - 1, 0xd9483b);
   return g;
 }
 
