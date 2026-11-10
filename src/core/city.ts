@@ -9,7 +9,10 @@
 import { SHOPS, type ShopDef } from './data/shops';
 import type { Element, ShopCategory } from './types';
 
-export type BuildingKind = 'terminal' | 'couloir' | 'salle' | 'porte' | 'piste' | 'tour' | 'arbre' | 'banc' | 'parterre' | 'fontaine';
+export type BuildingKind = 'terminal' | 'couloir' | 'salle' | 'porte' | 'piste' | 'voie' | 'stand' | 'tour' | 'arbre' | 'banc' | 'parterre' | 'fontaine';
+
+/** Where a building may stand: the terminal side (landside), the runway side (airside), or both. */
+export type Side = 'aerogare' | 'pistes' | 'libre';
 
 export interface BuildingDef {
   name: string;
@@ -21,6 +24,8 @@ export interface BuildingDef {
   walkable?: boolean;
   /** Only one allowed. */
   unique?: boolean;
+  /** Terminal side by default. Gates stand on the terminal side against the airside edge. */
+  side?: Side;
   /** Decoration: beauty given to rooms within this many tiles. */
   aura?: number;
   beauty?: number;
@@ -31,8 +36,10 @@ export const BUILDINGS: Record<BuildingKind, BuildingDef> = {
   couloir: { name: 'Couloir', emoji: '▫️', w: 1, d: 1, walkable: true },
   salle: { name: 'Salle', emoji: '🏪', w: 2, d: 2 },
   porte: { name: 'Porte', emoji: '🚪', w: 2, d: 1 },
-  piste: { name: 'Piste', emoji: '🛫', w: 2, d: 10 },
-  tour: { name: 'Tour de contrôle', emoji: '🗼', w: 2, d: 2, unique: true },
+  piste: { name: 'Piste', emoji: '🛫', w: 2, d: 12, side: 'pistes' },
+  voie: { name: 'Voie de circulation', emoji: '➖', w: 1, d: 1, side: 'pistes' },
+  stand: { name: 'Parking avion', emoji: '🅿️', w: 2, d: 2, side: 'pistes' },
+  tour: { name: 'Tour de contrôle', emoji: '🗼', w: 2, d: 2, unique: true, side: 'libre' },
   arbre: { name: 'Arbre', emoji: '🌳', w: 1, d: 1, aura: 1, beauty: 1 },
   banc: { name: 'Banc', emoji: '🪑', w: 1, d: 1, aura: 1, beauty: 1 },
   parterre: { name: 'Parterre', emoji: '🌷', w: 1, d: 1, aura: 1, beauty: 2 },
@@ -52,10 +59,16 @@ export interface Placed {
 }
 
 export interface CityLayout {
+  /** Bumped when the starter layout changes shape (older layouts are rebuilt). */
+  version?: number;
   width: number;
   depth: number;
+  /** Columns x >= airsideX are the runway side, reserved for runways, taxiways and stands. */
+  airsideX: number;
   items: Placed[];
 }
+
+export const CITY_VERSION = 2;
 
 export interface Rect {
   x: number;
@@ -92,12 +105,25 @@ export function itemAt(layout: CityLayout, x: number, z: number): Placed | undef
   return layout.items.find((p) => overlap(footprint(p), cell));
 }
 
-/** Whether `p` fits: inside the land, on free tiles (ignoring `p` itself), and not a second unique building. */
-export function canPlace(layout: CityLayout, p: Placed): boolean {
+/** Why `p` cannot stand where it is, or null when it fits. */
+export function placeError(layout: CityLayout, p: Placed): string | null {
   const r = footprint(p);
-  if (r.x < 0 || r.z < 0 || r.x + r.w > layout.width || r.z + r.d > layout.depth) return false;
-  if (BUILDINGS[p.kind].unique && layout.items.some((o) => o.kind === p.kind && o.uid !== p.uid)) return false;
-  return !layout.items.some((o) => o.uid !== p.uid && overlap(footprint(o), r));
+  if (r.x < 0 || r.z < 0 || r.x + r.w > layout.width || r.z + r.d > layout.depth) return 'Hors du terrain.';
+  const side = BUILDINGS[p.kind].side ?? 'aerogare';
+  const airside = r.x >= layout.airsideX;
+  const landside = r.x + r.w <= layout.airsideX;
+  if (side === 'pistes' && !airside) return 'Réservé au côté pistes.';
+  if (side === 'aerogare' && !landside) return 'Le côté pistes est réservé aux pistes, voies et parkings avions.';
+  if (side === 'libre' && !airside && !landside) return 'À cheval sur la clôture.';
+  if (p.kind === 'porte' && r.x + r.w !== layout.airsideX) return 'Une porte se pose contre la clôture du côté pistes.';
+  if (BUILDINGS[p.kind].unique && layout.items.some((o) => o.kind === p.kind && o.uid !== p.uid)) return 'Il n’y en a qu’une.';
+  if (layout.items.some((o) => o.uid !== p.uid && overlap(footprint(o), r))) return 'Pas de place ici.';
+  return null;
+}
+
+/** Whether `p` fits: inside the land, on its side of the fence, on free tiles (ignoring `p` itself), and not a second unique building. */
+export function canPlace(layout: CityLayout, p: Placed): boolean {
+  return placeError(layout, p) === null;
 }
 
 /** Places a new building or moves an existing one (same uid). Returns false if it does not fit. */
@@ -146,6 +172,34 @@ export function connected(layout: CityLayout): Set<string> {
   for (const p of layout.items)
     if (!reached.has(p.uid) && (p.kind === 'salle' || p.kind === 'porte') && hubs.some((h) => touching(h, footprint(p)))) reached.add(p.uid);
   return reached;
+}
+
+/**
+ * Runway side: runways, taxiways linked to a runway, and stands touching one
+ * of those. A gate is "in service" when it is linked to the terminal and a
+ * linked stand touches it across the fence.
+ */
+export function airsideLinked(layout: CityLayout): Set<string> {
+  const reached = new Set<string>();
+  const queue = layout.items.filter((p) => p.kind === 'piste');
+  for (const p of queue) reached.add(p.uid);
+  const ways = layout.items.filter((p) => p.kind === 'voie');
+  while (queue.length) {
+    const cur = footprint(queue.shift()!);
+    for (const w of ways)
+      if (!reached.has(w.uid) && touching(cur, footprint(w))) {
+        reached.add(w.uid);
+        queue.push(w);
+      }
+  }
+  const hubs = layout.items.filter((p) => reached.has(p.uid)).map(footprint);
+  for (const p of layout.items) if (p.kind === 'stand' && hubs.some((h) => touching(h, footprint(p)))) reached.add(p.uid);
+  return reached;
+}
+
+export function gatesInService(layout: CityLayout, linked = connected(layout), air = airsideLinked(layout)): Set<string> {
+  const stands = layout.items.filter((p) => p.kind === 'stand' && air.has(p.uid)).map(footprint);
+  return new Set(layout.items.filter((p) => p.kind === 'porte' && linked.has(p.uid) && stands.some((s) => touching(s, footprint(p)))).map((p) => p.uid));
 }
 
 const shopById = new Map(SHOPS.map((s) => [s.id, s]));
@@ -223,27 +277,34 @@ let uidCounter = 0;
 export const newUid = () => `b${Date.now().toString(36)}${(uidCounter++).toString(36)}`;
 
 /**
- * Starting layout: a 20 × 20 plot with the terminal in the middle, a runway
- * along one edge, the control tower, and the player's current shops placed
- * in a ring of corridors around the terminal (how saves will be converted).
+ * Starting layout, laid out like a real airport: the terminal side on the
+ * left (24 × 20 plot, fence at x = 14) with the terminal, corridors and the
+ * player's current shops around it; the runway side on the right with two
+ * gates on the fence, their stands, taxiways and the runway.
  */
 export function starterLayout(shopIds: string[] = []): CityLayout {
-  const layout: CityLayout = { width: 20, depth: 20, items: [] };
+  const layout: CityLayout = { version: CITY_VERSION, width: 24, depth: 20, airsideX: 14, items: [] };
   const add = (kind: BuildingKind, x: number, z: number, rot: 0 | 1 = 0, shopId?: string) =>
     place(layout, { uid: newUid(), kind, x, z, rot, shopId });
-  add('terminal', 8, 8);
-  add('piste', 17, 2);
-  add('tour', 14, 2);
-  add('porte', 11, 9, 1);
-  // Corridors around the terminal, then rooms on their outer side.
-  for (let x = 7; x <= 11; x++) add('couloir', x, 7);
-  for (let x = 7; x <= 10; x++) add('couloir', x, 11);
-  add('couloir', 7, 8);
-  add('couloir', 7, 9);
-  add('couloir', 7, 10);
-  const spots: [number, number][] = [[7, 5], [9, 5], [11, 5], [5, 7], [5, 9], [5, 11], [7, 12], [9, 12], [3, 7], [3, 9], [3, 11], [13, 5]];
+  add('terminal', 10, 8);
+  add('porte', 13, 8, 1);
+  add('porte', 13, 10, 1);
+  for (let x = 7; x <= 13; x++) add('couloir', x, 7);
+  for (let z = 8; z <= 11; z++) add('couloir', 9, z);
+  for (let x = 10; x <= 12; x++) add('couloir', x, 11);
+  const spots: [number, number][] = [[7, 5], [9, 5], [11, 5], [7, 8], [7, 10], [9, 12], [11, 12], [5, 6], [5, 8], [5, 10]];
   shopIds.slice(0, spots.length).forEach((id, i) => add('salle', spots[i][0], spots[i][1], 0, id));
-  add('arbre', 12, 12);
-  add('parterre', 11, 12);
+  add('arbre', 13, 12);
+  add('parterre', 13, 13);
+  // Runway side.
+  add('stand', 14, 8);
+  add('stand', 14, 10);
+  for (let x = 16; x <= 19; x++) {
+    add('voie', x, 9);
+    add('voie', x, 10);
+  }
+  for (let z = 3; z <= 14; z++) add('voie', 20, z);
+  add('piste', 21, 3);
+  add('tour', 16, 15);
   return layout;
 }

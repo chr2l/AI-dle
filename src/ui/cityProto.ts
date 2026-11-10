@@ -8,23 +8,28 @@
  */
 import { Group, Mesh, Plane, Raycaster, Vector2, Vector3, type Object3D } from 'three';
 import {
-  BUILDINGS, canPlace, connected, footprint, itemAt, newUid, place, remove, roomBonus, rotate, shopOf, starterLayout, ZONE_NAMES,
+  airsideLinked, BUILDINGS, canPlace, CITY_VERSION, connected, footprint, gatesInService, itemAt, newUid, place, placeError, remove, roomBonus, rotate,
+  shopOf, starterLayout, touching, ZONE_NAMES,
   type BuildingKind, type CityLayout, type Placed,
 } from '../core/city';
 import { SHOPS } from '../core/data/shops';
 import type { GameState } from '../core/types';
 import { meshFromGrid } from '../render/tower';
 import { PixelRenderer } from '../render/pixelRenderer';
-import { buildAlertModel, buildGhostModel, buildGroundModel, buildPlacedModel, TILE } from '../render/models/city';
+import { buildAlertModel, buildFenceModel, buildGhostModel, buildGroundModel, buildPlacedModel, TILE } from '../render/models/city';
+import { buildPlaneModel } from '../render/models/plane';
+import { PLANE_MODELS } from '../core/data/planes';
 import { iconize } from './icons';
 import { esc } from './widgets';
 
 const KEY = 'idleport.city';
 const RIGHT = new Vector3(1, 0, -1).normalize();
 const SCREEN_UP = new Vector3(-1, 2, -1).normalize();
-const PALETTE: BuildingKind[] = ['couloir', 'salle', 'porte', 'arbre', 'parterre', 'banc', 'fontaine', 'piste', 'tour'];
+const PALETTE: BuildingKind[] = ['couloir', 'salle', 'porte', 'arbre', 'parterre', 'banc', 'fontaine', 'voie', 'stand', 'piste', 'tour'];
+/** Runway side tools are shown after a divider in the bar. */
+const AIRSIDE_TOOLS: BuildingKind[] = ['voie', 'stand', 'piste'];
 /** Kinds that stay armed after a placement, to lay several in a row. */
-const REPEAT: BuildingKind[] = ['couloir', 'arbre', 'parterre', 'banc'];
+const REPEAT: BuildingKind[] = ['couloir', 'voie', 'arbre', 'parterre', 'banc'];
 
 type Tool = { placing: Placed; isNew: boolean } | null;
 
@@ -44,7 +49,7 @@ function load(state: GameState): CityLayout {
     const raw = localStorage.getItem(KEY);
     if (raw) {
       const l = JSON.parse(raw) as CityLayout;
-      if (Array.isArray(l.items) && l.items.some((p) => p.kind === 'terminal')) return l;
+      if (l.version === CITY_VERSION && Array.isArray(l.items) && l.items.some((p) => p.kind === 'terminal')) return l;
     }
   } catch {
     /* unreadable or blocked storage: start over */
@@ -274,13 +279,26 @@ class CityProto {
   private rebuild() {
     this.items.clear();
     const linked = connected(this.layout);
+    const air = airsideLinked(this.layout);
+    const inService = gatesInService(this.layout, linked, air);
+    const fence = meshFromGrid(buildFenceModel(this.layout));
+    fence.position.set(this.layout.airsideX * TILE, 1, 0);
+    this.items.add(fence);
     for (const p of this.layout.items) {
       if (this.tool && !this.tool.isNew && p.uid === this.tool.placing.uid) continue;
+      // A plane waits on every stand served by a gate in service.
+      if (p.kind === 'stand' && air.has(p.uid) && this.layout.items.some((g) => inService.has(g.uid) && touching(footprint(g), footprint(p)))) {
+        const r = footprint(p);
+        const plane = meshFromGrid(buildPlaneModel(PLANE_MODELS[0]));
+        plane.scale.setScalar(0.75);
+        plane.position.set(r.x * TILE + 1.5, 1, r.z * TILE + 0.4);
+        this.items.add(plane);
+      }
       const r = footprint(p);
       const mesh = meshFromGrid(buildPlacedModel(p));
       mesh.position.set(r.x * TILE, 1, r.z * TILE);
       this.items.add(mesh);
-      if ((p.kind === 'salle' || p.kind === 'porte') && !linked.has(p.uid)) {
+      if (((p.kind === 'salle' || p.kind === 'porte') && !linked.has(p.uid)) || (p.kind === 'stand' && !air.has(p.uid))) {
         const alert = meshFromGrid(buildAlertModel());
         alert.position.set((r.x + r.w / 2) * TILE - 1.5, p.kind === 'salle' ? 13 : 8, (r.z + r.d / 2) * TILE - 1.5);
         this.items.add(alert);
@@ -315,7 +333,7 @@ class CityProto {
     const avg = rooms.length ? rooms.reduce((s, p) => s + roomBonus(this.layout, p.uid, linked).multiplier, 0) / rooms.length : 0;
     const top =
       `<div class="cp-top"><button data-cp="back" class="cp-b">${this.tool || this.pickingShop ? '✖ Annuler' : '← Retour'}</button>` +
-      `<div class="cp-title"><b>Aéroport à plat</b><small>Essai · ${rooms.length} salles · bonus moyen ×${avg.toFixed(2)}</small></div>` +
+      `<div class="cp-title"><b>Aéroport à plat</b><small>${rooms.length} salles · bonus ×${avg.toFixed(2)}</small></div>` +
       `<button data-cp="reset" class="cp-b ghost">↺</button></div>`;
     let panel = '';
     if (this.pickingShop) {
@@ -325,10 +343,11 @@ class CityProto {
         list.map((s) => `<button data-cp="shop" data-arg="${s.id}" class="cp-shop">${s.emoji}<span>${esc(s.name)}</span></button>`).join('') + '</div></div>';
     } else if (this.tool) {
       const p = this.tool.placing;
-      const ok = canPlace(this.layout, p);
+      const err = placeError(this.layout, p);
       const shop = shopOf(p);
+      const where = BUILDINGS[p.kind].side === 'pistes' ? ' (côté pistes, à droite de la clôture)' : p.kind === 'porte' ? ' (contre la clôture)' : '';
       panel = `<div class="cp-card"><b>${BUILDINGS[p.kind].emoji} ${esc(shop?.name ?? BUILDINGS[p.kind].name)}</b>` +
-        `<small>${ok ? 'Touchez le terrain pour poser. Glissez pour déplacer la vue.' : 'Pas de place ici : choisissez des cases libres.'}</small>` +
+        `<small>${err ? esc(err) : `Touchez le terrain pour poser${where}. Glissez pour déplacer la vue.`}</small>` +
         `<div class="cp-row"><button data-cp="turn" class="cp-b">⟳ Tourner</button></div></div>`;
     } else if (this.selected) {
       const p = this.layout.items.find((o) => o.uid === this.selected)!;
@@ -337,7 +356,7 @@ class CityProto {
       panel = `<div class="cp-hint">Touchez un bâtiment pour voir ses bonus, ou choisissez quoi construire.</div>`;
     }
     const bar = this.tool || this.pickingShop ? '' :
-      `<div class="cp-bar">${PALETTE.map((k) => `<button data-cp="build" data-arg="${k}" class="cp-tool"><i>${BUILDINGS[k].emoji}</i><span>${BUILDINGS[k].name}</span></button>`).join('')}</div>`;
+      `<div class="cp-bar">${PALETTE.map((k) => `<button data-cp="build" data-arg="${k}" class="cp-tool${AIRSIDE_TOOLS.includes(k) ? ' air' : ''}"><i>${BUILDINGS[k].emoji}</i><span>${k === 'voie' ? 'Voie' : BUILDINGS[k].name}</span></button>`).join('')}</div>`;
     ui.innerHTML = iconize(top + `<div class="cp-bottom">${panel}${bar}</div>`);
   }
 
@@ -362,8 +381,14 @@ class CityProto {
     const note: Partial<Record<BuildingKind, string>> = {
       terminal: 'Le cœur de l’aéroport : tout doit s’y relier par des couloirs.',
       couloir: 'Relie salles et portes au terminal.',
-      porte: linked.has(p.uid) ? 'Un avion embarque ici. Les salles proches vendent plus.' : 'Pas reliée : posez un couloir jusqu’au terminal.',
+      porte: !linked.has(p.uid)
+        ? 'Pas reliée : posez un couloir jusqu’au terminal.'
+        : gatesInService(this.layout, linked).has(p.uid)
+          ? 'En service : un avion attend sur son parking. Les salles proches vendent plus.'
+          : 'Il lui faut un parking avion juste derrière la clôture, relié à la piste.',
       piste: 'Plus tard, sa longueur décidera quels avions peuvent décoller.',
+      voie: 'Les avions roulent ici : reliez chaque parking à la piste.',
+      stand: airsideLinked(this.layout).has(p.uid) ? 'Relié à la piste. Collez-le à une porte pour la mettre en service.' : 'Pas relié : tracez des voies de circulation jusqu’à la piste.',
       tour: 'Plus tard, les vols qui partent près d’elle auront moins d’incidents.',
     };
     const aura = def.aura ? `Beauté +${def.beauty} pour les salles à ${def.aura} case(s) ou moins.` : '';
@@ -403,6 +428,7 @@ const CSS = `
 .cp-hint { align-self: center; background: rgba(255,250,240,.92); border: 3px solid #2b2d42; border-radius: 12px; padding: 6px 10px; font-size: 13px; font-weight: 700; text-align: center; }
 .cp-bar { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 2px; scrollbar-width: none; }
 .cp-tool { flex: 0 0 auto; width: 72px; min-height: 64px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; border: 3px solid #2b2d42; border-radius: 14px; background: #fffaf0; box-shadow: 0 3px 0 #2b2d42; font: 800 12px var(--body, Nunito, sans-serif); color: #2b2d42; }
+.cp-tool.air { background: #e3e6ec; }
 .cp-tool i { font-style: normal; font-size: 22px; line-height: 1; }
 .cp-shops { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 6px; max-height: 40vh; overflow-y: auto; margin-top: 4px; }
 .cp-shop { min-height: 56px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; border: 2px solid #2b2d42; border-radius: 12px; background: #fff; font: 700 12px var(--body, Nunito, sans-serif); color: #2b2d42; font-size: 20px; }

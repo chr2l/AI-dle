@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
-  canPlace, connected, footprint, place, rectDistance, remove, roomBonus, rotate, starterLayout, touching, zoneBonus,
+  airsideLinked, canPlace, connected, gatesInService, placeError, footprint, place, rectDistance, remove, roomBonus, rotate, starterLayout, touching, zoneBonus,
   type CityLayout, type Placed,
 } from '../src/core/city';
 
-const empty = (): CityLayout => ({ width: 12, depth: 12, items: [] });
+const empty = (airsideX = 12): CityLayout => ({ width: 12, depth: 12, airsideX, items: [] });
 const P = (uid: string, kind: Placed['kind'], x: number, z: number, shopId?: string, rot: 0 | 1 = 0): Placed => ({ uid, kind, x, z, rot, shopId });
 
 describe('city layout', () => {
@@ -20,12 +20,12 @@ describe('city layout', () => {
   it('moves and rotates in place, keeps the terminal', () => {
     const l = empty();
     place(l, P('t', 'terminal', 0, 0));
-    place(l, P('g', 'porte', 3, 0));
-    expect(footprint(l.items[1])).toEqual({ x: 3, z: 0, w: 2, d: 1 });
-    expect(rotate(l, 'g')).toBe(true);
-    expect(footprint(l.items[1])).toEqual({ x: 3, z: 0, w: 1, d: 2 });
+    place(l, P('g', 'fontaine', 3, 0));
+    place(l, P('g2', 'banc', 5, 0));
+    expect(rotate(l, 'g2')).toBe(true);
     expect(place(l, { ...l.items[1], x: 6 })).toBe(true);
-    expect(l.items).toHaveLength(2);
+    expect(footprint(l.items[1])).toEqual({ x: 6, z: 0, w: 2, d: 2 });
+    expect(l.items).toHaveLength(3);
     expect(remove(l, 't')).toBe(false);
     expect(remove(l, 'g')).toBe(true);
   });
@@ -58,7 +58,9 @@ describe('city layout', () => {
     const alone = roomBonus(l, 'a');
     expect(alone.neighbours).toBe(2); // b below and c on the right, both neutral
     place(l, P('f', 'fontaine', 0, 3));
+    l.airsideX = 2;
     place(l, P('g', 'porte', 0, 5));
+    expect(l.items.some((p) => p.uid === 'g')).toBe(true);
     const r = roomBonus(l, 'a');
     expect(r.zoneSize).toBe(3);
     expect(r.zone).toBe(0.1);
@@ -68,12 +70,39 @@ describe('city layout', () => {
     expect(zoneBonus(6)).toBe(0.25);
   });
 
+  it('keeps the runway side for runways, taxiways and stands', () => {
+    const l = empty(6);
+    expect(placeError(l, P('r', 'piste', 2, 0))).toMatch(/côté pistes/);
+    expect(canPlace(l, P('r', 'piste', 6, 0))).toBe(true);
+    expect(canPlace(l, P('s', 'salle', 6, 0))).toBe(false);
+    expect(canPlace(l, P('s', 'salle', 5, 0))).toBe(false); // straddles the fence
+    expect(canPlace(l, P('g', 'porte', 2, 0))).toBe(false); // not against the fence
+    expect(canPlace(l, P('g', 'porte', 4, 0))).toBe(true);
+    expect(canPlace(l, P('w', 'tour', 0, 8))).toBe(true);
+    expect(canPlace(l, P('w', 'tour', 8, 8))).toBe(true);
+  });
+
+  it('links stands to the runway by taxiways and puts gates in service', () => {
+    const l = empty(4);
+    place(l, P('t', 'terminal', 0, 0));
+    place(l, P('g', 'porte', 3, 0, undefined, 1));
+    place(l, P('s', 'stand', 4, 0));
+    place(l, P('v', 'voie', 6, 0));
+    place(l, P('r', 'piste', 8, 0));
+    expect(airsideLinked(l).has('s')).toBe(false);
+    expect(gatesInService(l).size).toBe(0);
+    place(l, P('v2', 'voie', 7, 0));
+    expect(airsideLinked(l).has('s')).toBe(true);
+    expect([...gatesInService(l)]).toEqual(['g']);
+  });
+
   it('starter layout fits and links most rooms', () => {
     const l = starterLayout(['cafe', 'sandwich', 'cafe', 'sandwich', 'cafe', 'sandwich', 'cafe', 'sandwich', 'cafe', 'sandwich']);
     expect(l.items.filter((p) => p.kind === 'salle')).toHaveLength(10);
     const linked = connected(l);
     const rooms = l.items.filter((p) => p.kind === 'salle');
     expect(rooms.filter((p) => linked.has(p.uid)).length).toBeGreaterThanOrEqual(8);
-    for (const p of l.items) expect(canPlace(l, p)).toBe(true);
+    for (const p of l.items) expect(placeError(l, p)).toBeNull();
+    expect(gatesInService(l).size).toBe(2);
   });
 });
