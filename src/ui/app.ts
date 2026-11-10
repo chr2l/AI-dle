@@ -1225,7 +1225,7 @@ export class App {
     this.lastCoins = s.coins;
     const xpNeed = G.xpToNext(s.level);
     const res = (key: string, icon: string, value: string, label: string, cls = '') =>
-      `<button class="res ${cls}" ${key === 'miles' ? 'data-act="boutique"' : `data-act="help" data-args='["${key}"]'`} data-res="${key}"><span class="ri">${icon}</span><span class="rv">${value}</span><span class="rl">${label}</span></button>`;
+      `<button class="res ${cls}" ${key === 'miles' ? 'data-act="boutique"' : `data-act="help" data-args='["${key}"]'`} data-res="${key}"><span class="ri">${icon}</span><span class="rv${value.length >= 6 ? ' xl' : value.length >= 5 ? ' l' : ''}">${value}</span><span class="rl">${label}</span></button>`;
     morph(this.root.querySelector('#hud')!,
       `<div class="res-row">` +
       res('coins', '🪙', fmt(this.shownCoins, true), (s.boosts.coinsX2Until ?? 0) > this.now ? `×2 · ${dur(s.boosts.coinsX2Until! - this.now)}` : `+${perSec(G.totalShopRate(s))}/s`, gained ? 'gain' : (s.boosts.coinsX2Until ?? 0) > this.now ? 'boosted' : '') +
@@ -1632,7 +1632,7 @@ export class App {
     if (!research && this.volsView === 'recherche') this.volsView = 'avions';
     const pending = s.reports.filter((r) => r.pending);
     const landed = s.planes.filter((p) => p.flight && p.flight.endsAt <= now).length;
-    let html = `<div class="seg">${seg('avions', `🛩️ Avions ${s.planes.length}/${G.hangarSize(s.level)}`)}${seg('departs', `🛫 Départs${landed ? ` <i class="sb">${landed}</i>` : ''}`)}${seg('pays', '🌍 Pays')}${research ? seg('recherche', `🔬 Recherche${s.researching ? ' ⏳' : ''}`) : ''}</div>`;
+    let html = `<div class="seg">${seg('avions', `🛩️ Avions ${s.planes.length}`)}${seg('departs', `🛫 Départs${landed ? ` <i class="sb">${landed}</i>` : ''}`)}${seg('pays', '🌍 Pays')}${research ? seg('recherche', `🔬 Recherche${s.researching ? ' ⏳' : ''}`) : ''}</div>`;
     if (pending.length) {
       html += pending.map((r) => `<button class="alert" data-act="showReport" data-args='["${r.id}"]'>${EVENT_BY_ID[r.event!.defId].emoji} Incident au retour de ${esc(r.destName)} : touchez pour décider</button>`).join('');
     }
@@ -2218,7 +2218,7 @@ export class App {
       DAILY_REWARDS.map((r, k) => {
         const day = k + 1;
         const state = day < daily.streak || (day === daily.streak && !daily.available) ? 'got' : day === daily.streak ? 'today' : '';
-        return `<div class="day ${state}"><small>J${day}</small><span>${dailyIcon(r)}</span></div>`;
+        return `<div class="day ${state}"><small>${currentLang() === 'en' ? 'D' : 'J'}${day}</small><span>${dailyIcon(r)}</span></div>`;
       }).join('') + '</div>' +
       button({ act: 'daily', label: daily.available ? `Récupérer : ${dailyLabel(daily.reward, s.level)}` : 'Déjà récupéré, revenez demain', kind: 'main', wide: true, why: daily.available ? false : 'Revenez demain pour le jour suivant.' }) + '</div>';
     return html;

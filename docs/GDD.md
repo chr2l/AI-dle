@@ -1,6 +1,6 @@
 # IdlePort — Game Design Document (v1)
 
-> Jeu mobile idle **vertical**, en **voxel 3D rendu en pixel art** (vue isométrique).
+> Jeu mobile idle **vertical**, en **voxel 3D « cube art »** (vue isométrique, style pixel art en option).
 > Le joueur gère un aéroport qui grandit étage par étage, ouvre des magasins tirés au sort,
 > recrute un équipage, améliore ses avions et les envoie vers une carte imaginaire de plus en plus lointaine.
 
@@ -348,10 +348,12 @@ Chaque avion qui ouvre un anneau est disponible **avant** l'anneau : le joueur l
 
 | Profil | Niv 4 (anneau 2) | Niv 8 (anneau 3) | Niv 10 | Niv 13 (anneau 4) |
 |---|---|---|---|---|
-| Assidu (10 min toutes les 1 h 30) | 6 h | 31 h | 54 h | 156 h (6,5 jours) |
-| Occasionnel (5 min toutes les 4 h) | 32 h | 124 h (5 jours) | 196 h (8 jours) | > 10 jours |
+| Assidu (10 min toutes les 1 h 30) | 6 h | 33 h | 57 h | 252 h (10,5 jours ; la 1re Franchise, au niveau 12 vers 129 h, passe avant) |
+| Occasionnel (5 min toutes les 4 h) | 32 h | 124 h (5 jours) | 196 h (8 jours) | > 10 jours (mesure d'octobre 2026) |
 
-Revenus du joueur assidu : ~130 🪙/s après 6 h, ~1 700 🪙/s au jour 2, ~8 000 🪙/s au jour 7. Miles gagnés sans pub ni achat : ~160 en 10 jours (missions 46, Millionnaire, événements rares).
+Revenus du joueur assidu (mesure du 10 novembre 2026) : ~105 🪙/s après 6 h, ~1 400 🪙/s après 30 h, ~6 300 🪙/s au jour 4. Miles gagnés sans pub ni achat : surtout le Millionnaire et les événements rares (Noël, trésor), plus les 56 des missions.
+
+**Angles morts de la simulation** : le joueur scripté n'ouvre aucune boîte de plans, ne fait aucun pari, ne satisfait presque aucun VIP de pays (1 en 28 jours) et n'achète jamais le Colibri Jet (5 à 6 avions au total). Ces systèmes ne sont donc pas validés par la simulation tant qu'elle ne les joue pas.
 Vers le niveau 12-13, les pièces s'accumulent plus vite que les étages ne se construisent : c'est exactement là que la **Franchise** (§14) se débloque et relance la boucle.
 
 ## 11. Missions (onboarding)
@@ -466,9 +468,9 @@ Revendre l'aéroport pour en ouvrir un dans une nouvelle ville.
 | **Boîtes de plans** et **pari de rareté** (§22) | minutes → semaines | ✅ moteur |
 | **Succès** à paliers (36) | semaines → mois | ✅ nouveau |
 | **Franchise** (prestige infini) | semaines → mois | ✅ nouveau |
-| **Notifications** planifiées | retour du joueur | ✅ calculées, à brancher (Capacitor) |
+| **Notifications** planifiées | retour du joueur | ✅ branchées (rappels locaux Capacitor) |
 | **Événements saisonniers** (9 par an, piste de récompenses, trophées) | mois → années | ✅ nouveau (§19) |
-| **Social** : amis, cadeaux, visites, classement hebdo | jours → mois | ✅ moteur, serveur à brancher (§20) |
+| **Social** : amis, cadeaux, visites, classement hebdo | jours → mois | ✅ moteur et serveur Cloudflare prêt (`server/social`), à déployer (§20) |
 
 ### 18.2 Cadeau quotidien
 Un cadeau par jour (jour UTC), cycle de 7 jours. Manquer un jour fait recommencer le cycle au jour 1.

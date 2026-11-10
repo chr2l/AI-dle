@@ -54,6 +54,9 @@ button .c, .jhint, #tabs button { font-size: 13px; }
 /* --- HUD on narrow phones (360 px): counters shrink, the ⚙ stays visible --- */
 .res-row > .res { min-width: 0; }
 .res .rv, .res .rl { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* Long values (salle « 120/120 ») shrink instead of being cut. */
+.res .rv.l { font-size: 16px; }
+.res .rv.xl { font-size: 14px; letter-spacing: -.3px; }
 @media (max-width: 420px) {
   .res-row { gap: 5px; }
   .res { padding: 3px 5px; column-gap: 4px; }
@@ -63,6 +66,8 @@ button .c, .jhint, #tabs button { font-size: 13px; }
   .res { padding: 3px 4px; column-gap: 3px; }
   .res .ri { font-size: 18px; }
   .res .rv { font-size: 16px; }
+  .res .rv.l { font-size: 15px; }
+  .res .rv.xl { font-size: 12px; letter-spacing: -.3px; }
 }
 
 /* --- Tower view reacts (plan de polish IP-11) ------------------------------ */
