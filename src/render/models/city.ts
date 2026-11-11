@@ -3,7 +3,7 @@
  * the layout is TILE voxels wide; each model is built at its rotated
  * footprint, its corner at the origin, standing on y = 1 (y = 0 is the ground).
  */
-import { BUILDINGS, footprint, shopOf, type CityLayout, type Placed } from '../../core/city';
+import { BUILDINGS, footprint, PLOT, plotKey, shopOf, type CityLayout, type Placed, type ShopResolver } from '../../core/city';
 import { CATEGORIES } from '../../core/data/shops';
 import { darken, grain, lighten, NEUTRAL_PALETTE, paletteFor, rng, toHex } from '../palette';
 import { VoxelGrid } from '../voxel';
@@ -12,6 +12,7 @@ export const TILE = 6;
 
 const [WALL, BLUE, DARK, ORANGE] = NEUTRAL_PALETTE.map(toHex);
 const GRASS = [0x8cc06b, 0x84b964];
+const LOCKED = [0x9a9a6a, 0x929263];
 const GLASS = 0x5b8fc9;
 
 const CATEGORY_COLOR: Record<string, number> = { resto: 0xf4a259, boutique: 0xe56b9f, detente: 0x7cc6a4, service: 0x6c8ebf, loisir: 0xa883d8 };
@@ -43,13 +44,17 @@ export function buildGroundModel(layout: CityLayout): VoxelGrid {
       const tz = Math.floor(z / TILE);
       const seam = x % TILE === 0 || z % TILE === 0;
       const airside = tx >= layout.airsideX;
-      const base = airside ? (tz % 2 ? 0xb9bcc4 : 0xb3b6be) : GRASS[(tx + tz) % 2];
-      g.set(x, 0, z, grain(rand, seam ? darken(base, airside ? 0.12 : 0.06) : base, 0.03));
+      // Land not bought yet: dry darker grass, with the plot edges marked.
+      const locked = !airside && !!layout.plots && !layout.plots.includes(plotKey(Math.floor(tx / PLOT), Math.floor(tz / PLOT)));
+      const plotEdge = locked && (x % (TILE * PLOT) === 0 || z % (TILE * PLOT) === 0);
+      const base = airside ? (tz % 2 ? 0xb9bcc4 : 0xb3b6be) : locked ? LOCKED[(tx + tz) % 2] : GRASS[(tx + tz) % 2];
+      g.set(x, 0, z, grain(rand, plotEdge ? 0xd8c27a : seam ? darken(base, airside ? 0.12 : 0.06) : base, 0.03));
     }
   return g;
 }
 
-export function buildPlacedModel(p: Placed): VoxelGrid {
+/** `shopFor` finds the shop of a room (its floor in a game; its shopId by default). */
+export function buildPlacedModel(p: Placed, shopFor: ShopResolver = shopOf): VoxelGrid {
   const r = footprint(p);
   const W = r.w * TILE;
   const D = r.d * TILE;
@@ -58,7 +63,7 @@ export function buildPlacedModel(p: Placed): VoxelGrid {
   switch (p.kind) {
     case 'terminal': return terminal(W, D, rand);
     case 'couloir': return corridor(W, D, rand);
-    case 'salle': return room(p, W, D, rand);
+    case 'salle': return room(shopFor(p), W, D, rand);
     case 'porte': return gate(W, D);
     case 'piste': return runway(W, D);
     case 'voie': return taxiway(W, D, rand);
@@ -103,8 +108,7 @@ function corridor(W: number, D: number, rand: () => number): VoxelGrid {
   return g;
 }
 
-function room(p: Placed, W: number, D: number, rand: () => number): VoxelGrid {
-  const shop = shopOf(p);
+function room(shop: ReturnType<ShopResolver>, W: number, D: number, rand: () => number): VoxelGrid {
   const [main, accent] = (shop?.colors ?? ['#cccccc', '#888888']).map(toHex);
   const pal = paletteFor(shop?.elements[0] ?? 'neutre');
   const H = 7;

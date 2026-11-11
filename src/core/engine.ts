@@ -83,6 +83,8 @@ import type {
   VipResult,
 } from './types';
 
+import { onFloorAdded, onFloorsSwapped } from './cityGame';
+
 export type Result<T = void> = { ok: true; value: T } | { ok: false; error: string };
 
 const ok = <T>(value: T): Result<T> => ({ ok: true, value });
@@ -226,6 +228,7 @@ export function buildFloor(state: GameState, now: number): Result {
   if (state.coins < cost) return fail('Pas assez de pièces.');
   state.coins -= cost;
   state.floors.push({ buildEndsAt: now + buildDuration(n) * 1000 });
+  onFloorAdded(state, n - 1);
   return done;
 }
 
@@ -361,6 +364,7 @@ export function setColor(state: GameState, target: number | 'facade' | 'lobby', 
 export function swapFloors(state: GameState, a: number, b: number): Result {
   if (a === b || !isBuilt(state, a) || !isBuilt(state, b)) return fail('Étages invalides.');
   [state.floors[a], state.floors[b]] = [state.floors[b], state.floors[a]];
+  onFloorsSwapped(state, a, b);
   return done;
 }
 

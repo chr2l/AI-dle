@@ -1,6 +1,7 @@
 // Versioned local save (GDD §16).
 import { SAVE_VERSION, createInitialState, emptyStats } from './state';
 import type { GameState } from './types';
+import { cityFromFloors, ensureCity } from './cityGame';
 
 export const SAVE_KEY = 'idleport.save';
 /** Previous good save, kept in case the latest write is cut short. */
@@ -13,7 +14,12 @@ export interface SaveStorage {
 }
 
 /** Upgrades older saves step by step. Add a case for each new SAVE_VERSION. */
-const MIGRATIONS: Record<number, (raw: Record<string, unknown>) => void> = {};
+const MIGRATIONS: Record<number, (raw: Record<string, unknown>) => void> = {
+  // 1 → 2: the tower becomes a flat airport; every floor gets its room around the terminal.
+  1: (raw) => {
+    raw.city = cityFromFloors(Array.isArray(raw.floors) ? raw.floors.length : 0);
+  },
+};
 
 export function serialize(state: GameState): string {
   return JSON.stringify(state);
@@ -36,6 +42,7 @@ export function deserialize(json: string, now: number): GameState | null {
   state.stats = { ...emptyStats(), ...state.stats };
   state.resources = { ...base.resources, ...state.resources };
   state.timers = { ...base.timers, ...state.timers };
+  ensureCity(state);
   return state;
 }
 

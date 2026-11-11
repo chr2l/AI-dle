@@ -186,6 +186,8 @@ export interface GameState {
   resources: Record<CountryId, number>;
 
   floors: FloorState[];
+  /** The flat airport (GDD §24): where each floor's room stands, corridors, gates, decorations. */
+  city?: import('./city').CityLayout;
   plans: string[];
   fusion?: { a: string; b: string; resultId: string; endsAt: number };
 
