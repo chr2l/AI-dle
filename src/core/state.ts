@@ -1,3 +1,4 @@
+import { gameStarterLayout } from './city';
 import { COUNTRIES } from './data/countries';
 import { PLANE_BY_ID } from './data/planes';
 import { FIRST_NAMES } from './data/crew';
@@ -25,7 +26,7 @@ export function defaultPlayerName(seed: number): string {
   return `${FIRST_NAMES[seed % FIRST_NAMES.length]} ${(seed % 900) + 100}`;
 }
 
-export const SAVE_VERSION = 1;
+export const SAVE_VERSION = 2;
 
 export const STARTING_COINS = 300;
 export const STARTING_MILES = 10;
@@ -67,6 +68,7 @@ export function createInitialState(now: number, seed = Math.floor(Math.random() 
     resources,
 
     floors: [],
+    city: gameStarterLayout(),
     plans: [],
 
     lounge: { level: 1, passengers: 0 },

@@ -1,12 +1,12 @@
 // Derived values computed from the state (never stored in the save).
 import { PASS_ID, PASS_INCOME_PCT } from './monetization';
+import { roomMultiplier } from './cityGame';
 import { COUNTRY_BY_ID } from './data/countries';
 import { CREW_RARITY, TRAIT_BY_ID } from './data/crew';
 import { MODULES, MODULE_BY_ID, PLANE_BY_ID } from './data/planes';
 import { DECO_BY_ID, TECH_BY_ID, type DecoDef } from './data/research';
 import { RARITY_INFO, SHOPS, SHOP_BY_ID, type ShopDef } from './data/shops';
 import {
-  ADJACENCY_BONUS,
   ALBUM_FUSION_BONUS,
   ALBUM_SET_BONUS,
   PRESTIGE_STAR_BONUS,
@@ -109,26 +109,18 @@ export function shopPool(state: GameState, category?: ShopCategory): ShopDef[] {
   });
 }
 
-function sharesElement(a: ShopDef, b: ShopDef | undefined): boolean {
-  if (!b) return false;
-  return a.elements.some((e) => e !== 'neutre' && b.elements.includes(e));
-}
 
 /** Coins per second sold by the shop on this floor while it has stock. */
 export function shopRate(state: GameState, floorIndex: number): number {
   const shop = state.floors[floorIndex]?.shop;
   if (!shop) return 0;
   const def = SHOP_BY_ID[shop.defId];
-  const neighbors = [floorIndex - 1, floorIndex + 1].filter((i) => {
-    const other = state.floors[i]?.shop;
-    return sharesElement(def, other && SHOP_BY_ID[other.defId]);
-  }).length;
   return (
     RARITY_INFO[def.rarity].rate *
     1.25 ** (shop.level - 1) *
     (1 + 0.5 * (shop.stars - 1)) *
     (1 + TRAFFIC_BONUS * (state.level - 1)) *
-    (1 + ADJACENCY_BONUS * neighbors) *
+    roomMultiplier(state, floorIndex) *
     (1 + decoBonuses(state).shopIncomePct + carnetBonus(state) + albumBonus(state)) *
     prestigeMult(state) *
     (state.purchases?.includes(PASS_ID) ? 1 + PASS_INCOME_PCT : 1)

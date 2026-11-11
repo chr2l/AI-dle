@@ -29,6 +29,7 @@ import { mulberry32 } from '../src/core/rng';
 import { createInitialState } from '../src/core/state';
 import { planeStats, shopPool, shopRate } from '../src/core/stats';
 import type { CrewMember, Destination, GameState } from '../src/core/types';
+import { cityPlace, ensureCity, floorBonus } from '../src/core/cityGame';
 
 const T0 = 1_800_000_000_000;
 const S = 1000;
@@ -144,14 +145,23 @@ describe('tower', () => {
     expect(shopRate(state, i)).toBeCloseTo(1.25);
   });
 
-  it('applies adjacency bonuses, and swapping floors changes them', () => {
+  it('gives neighbouring rooms of the same element +10 % on the land', () => {
+    const c = builtFloorWithShop('cafe');
     const a = builtFloorWithShop('disquaire');
     const b = builtFloorWithShop('karaoke');
-    const c = builtFloorWithShop('cafe');
-    expect(shopRate(state, a)).toBeCloseTo(1.1);
-    expect(shopRate(state, b)).toBeCloseTo(1.6 * 1.1);
+    ensureCity(state); // a and b end up side by side, c alone
+    const bonus = floorBonus(state, a)!;
+    expect(bonus.neighbours).toBe(1);
+    const base = shopRate(state, a) / bonus.multiplier;
+    expect(bonus.multiplier).toBeCloseTo(1.1 * (bonus.nearGate ? 1.15 : 1) * (1 + Math.min(0.3, 0.03 * bonus.beauty)));
+    // Swapping floors keeps every shop where it stands on the land.
     expect(swapFloors(state, b, c).ok).toBe(true);
-    expect(shopRate(state, a)).toBeCloseTo(1);
+    expect(floorBonus(state, a)!.multiplier).toBeCloseTo(bonus.multiplier);
+    expect(shopRate(state, a)).toBeCloseTo(base * bonus.multiplier);
+    // Moved away from the network, cut off from the terminal, it sells nothing.
+    const room = state.city!.items.find((p) => p.kind === 'salle' && p.floor === a)!;
+    expect(cityPlace(state, { ...room, x: 12, z: 4 }).ok).toBe(true);
+    expect(shopRate(state, a)).toBe(0);
   });
 
   it('fills the lounge up to its capacity', () => {

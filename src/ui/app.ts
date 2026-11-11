@@ -525,7 +525,7 @@ export class App {
         break;
       case 'city':
         this.closeSheet();
-        openCityProto(this.state);
+        openCityProto(this.state, () => this.render());
         break;
       case 'set':
         setSetting(a[0] as keyof Settings, a[1] as never);
@@ -1035,7 +1035,7 @@ export class App {
       sheetHead(`👤 ${esc(s.social.name)}`, `Code ami ${esc(s.social.code)}`) +
       `<div class="card"><b>⭐ Niveau ${s.level}</b>${bar(s.xp / xpNeed, 'xp')}<small>${fmt(s.xp)}/${fmt(xpNeed)} XP · <span>chaque dépense et chaque vol en rapporte. Monter ouvre des étages, des avions et des pays.</span></small></div>` +
       `<h3>Carrière</h3><div class="career">${lines.map((l) => `<div><span>${l.icon}</span><b>${l.coins ? fmt(l.value) : l.value.toLocaleString(currentLang() === 'en' ? 'en-US' : 'fr-FR')}</b><small>${l.label}</small></div>`).join('')}</div>` +
-      button({ act: 'city', label: '🏗️ Essayer l’aéroport à plat', sub: 'Prototype : poser et déplacer ses salles', kind: 'main', wide: true }) +
+      button({ act: 'city', label: '🏗️ Mon aéroport au sol', sub: 'Placez vos salles : leur position change leurs revenus', kind: 'main', wide: true }) +
       (this.tower ? button({ act: 'photo', label: '📷 Photo de mon aéroport', sub: 'À partager avec vos amis', kind: 'main', wide: true }) : '') +
       button({ act: 'close', label: 'Fermer', kind: 'ghost', wide: true })
     );
